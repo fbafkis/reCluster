@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # MIT License
 #
-# Copyright (c) 2022-2023 Carlo Corradini
+# Copyright (c) 2022-2022 Carlo Corradini
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -27,7 +27,673 @@ DIRNAME=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 # Load commons
 # shellcheck source=scripts/__commons.sh
-. "$DIRNAME/scripts/__commons.sh"
+# . "$DIRNAME/scripts/__commons.sh"
+# MIT License
+#
+# Copyright (c) 2022-2022 Carlo Corradini
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+# Fail on error
+set -o errexit
+# Disable wildcard character expansion
+set -o noglob
+
+# ================
+# GLOBALS
+# ================
+# Downloader
+DOWNLOADER=
+# Return value
+RETVAL=
+
+# ================
+# PARSE ARGUMENTS
+# ================
+# Assert argument has a value
+# @param $1 Argument name
+# @param $2 Argument value
+parse_args_assert_value() {
+  [ -n "$2" ] || FATAL "Argument '$1' requires a non-empty value"
+}
+# Assert argument value is a non negative integer (>= 0)
+# @param $1 Argument name
+# @param $2 Argument value
+parse_args_assert_non_negative_integer() {
+  { is_integer "$2" && [ "$2" -ge 0 ]; } || FATAL "Value '$2' of argument '$1' is not a non negative number"
+}
+# Assert argument value is a positive integer (> 0)
+# @param $1 Argument name
+# @param $2 Argument value
+parse_args_assert_positive_integer() {
+  { is_integer "$2" && [ "$2" -gt 0 ]; } || FATAL "Value '$2' of argument '$1' is not a positive number"
+}
+# Parse command line arguments
+# @param $@ Arguments
+parse_args_commons() {
+  # Number of shift
+  _shifts=1
+
+  # Parse
+  case $1 in
+  --disable-color)
+    # Disable color
+    LOG_COLOR_ENABLE=false
+    ;;
+  --disable-spinner)
+    # Disable spinner
+    SPINNER_ENABLE=false
+    ;;
+  --log-level)
+    # Log level
+    parse_args_assert_value "$@"
+
+    case $2 in
+    fatal) LOG_LEVEL=$LOG_LEVEL_FATAL ;;
+    error) LOG_LEVEL=$LOG_LEVEL_ERROR ;;
+    warn) LOG_LEVEL=$LOG_LEVEL_WARN ;;
+    info) LOG_LEVEL=$LOG_LEVEL_INFO ;;
+    debug) LOG_LEVEL=$LOG_LEVEL_DEBUG ;;
+    *) FATAL "Value '$2' of argument '$1' is invalid" ;;
+    esac
+    _shifts=2
+    ;;
+  --spinner)
+    # Spinner
+    parse_args_assert_value "$@"
+
+    case $2 in
+    dots) SPINNER_SYMBOLS=$SPINNER_SYMBOLS_DOTS ;;
+    grayscale) SPINNER_SYMBOLS=$SPINNER_SYMBOLS_GRAYSCALE ;;
+    propeller) SPINNER_SYMBOLS=$SPINNER_SYMBOLS_PROPELLER ;;
+    *) FATAL "Value '$2' of argument '$1' is invalid" ;;
+    esac
+    _shifts=2
+    ;;
+  -*)
+    # Unknown argument
+    WARN "Unknown argument '$1' is ignored"
+    ;;
+  *)
+    # No argument
+    WARN "Skipping argument '$1'"
+    ;;
+  esac
+
+  # Return
+  RETVAL=$_shifts
+}
+
+# ================
+# LOGGER
+# ================
+# Fatal log level. Cause exit failure
+LOG_LEVEL_FATAL=100
+# Error log level
+LOG_LEVEL_ERROR=200
+# Warning log level
+LOG_LEVEL_WARN=300
+# Informational log level
+LOG_LEVEL_INFO=500
+# Debug log level
+LOG_LEVEL_DEBUG=600
+# Log level
+LOG_LEVEL=$LOG_LEVEL_INFO
+# Log color flag
+LOG_COLOR_ENABLE=true
+
+# Convert log level to equivalent name
+# @param $1 Log level
+to_log_level_name() {
+  _log_level=${1:-LOG_LEVEL}
+  _log_level_name=
+
+  case $_log_level in
+  "$LOG_LEVEL_FATAL") _log_level_name=fatal ;;
+  "$LOG_LEVEL_ERROR") _log_level_name=error ;;
+  "$LOG_LEVEL_WARN") _log_level_name=warn ;;
+  "$LOG_LEVEL_INFO") _log_level_name=info ;;
+  "$LOG_LEVEL_DEBUG") _log_level_name=debug ;;
+  *) FATAL "Unknown log level '$_log_level'" ;;
+  esac
+
+  printf '%s\n' "$_log_level_name"
+}
+
+# Check if log level is enabled
+# @param $1 Log level
+is_log_level_enabled() {
+  [ "$1" -le "$LOG_LEVEL" ]
+
+  return $?
+}
+
+# Print log message
+# @param $1 Log level
+# @param $2 Message
+_log_print_message() {
+  _log_level=${1:-LOG_LEVEL_FATAL}
+  shift
+  _log_level_name=
+  _log_message=${*:-}
+  _log_prefix=
+  _log_suffix="\033[0m"
+
+  # Check log level
+  is_log_level_enabled "$_log_level" || return 0
+
+  case $_log_level in
+  "$LOG_LEVEL_FATAL")
+    _log_level_name=FATAL
+    _log_prefix="\033[41;37m"
+    ;;
+  "$LOG_LEVEL_ERROR")
+    _log_level_name=ERROR
+    _log_prefix="\033[1;31m"
+    ;;
+  "$LOG_LEVEL_WARN")
+    _log_level_name=WARN
+    _log_prefix="\033[1;33m"
+    ;;
+  "$LOG_LEVEL_INFO")
+    _log_level_name=INFO
+    _log_prefix="\033[37m"
+    ;;
+  "$LOG_LEVEL_DEBUG")
+    _log_level_name=DEBUG
+    _log_prefix="\033[1;34m"
+    ;;
+  esac
+
+  # Check color flag
+  if [ "$LOG_COLOR_ENABLE" = false ]; then
+    _log_prefix=
+    _log_suffix=
+  fi
+
+  # Log
+  printf '%b[%-5s] %b%b\n' "$_log_prefix" "$_log_level_name" "$_log_message" "$_log_suffix"
+}
+
+# Fatal log message
+# @param $1 Message
+FATAL() {
+  _log_print_message "$LOG_LEVEL_FATAL" "$1" >&2
+  exit 1
+}
+# Error log message
+# @param $1 Message
+ERROR() { _log_print_message "$LOG_LEVEL_ERROR" "$1" >&2; }
+# Warning log message
+# @param $1 Message
+WARN() { _log_print_message "$LOG_LEVEL_WARN" "$1" >&2; }
+# Informational log message
+# @param $1 Message
+INFO() { _log_print_message "$LOG_LEVEL_INFO" "$1"; }
+# Debug log message
+# @param $1 Message
+# @param $2 JSON value
+DEBUG() {
+  _log_print_message "$LOG_LEVEL_DEBUG" "$1"
+  if [ -n "$2" ] && is_log_level_enabled "$LOG_LEVEL_DEBUG"; then
+    printf '%s\n' "$2" | jq '.'
+  fi
+}
+
+# ================
+# SPINNER
+# ================
+# Spinner PID
+SPINNER_PID=
+# Spinner symbol time in seconds
+SPINNER_TIME=.1
+# Spinner symbols dots
+SPINNER_SYMBOLS_DOTS="⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏"
+# Spinner symbols grayscale
+SPINNER_SYMBOLS_GRAYSCALE="░░░░░░░ ▒░░░░░░ ▒▒░░░░░ ▒▒▒░░░░ ▒▒▒▒░░░ ▒▒▒▒▒░░ ▒▒▒▒▒▒░ ▒▒▒▒▒▒▒ ░▒▒▒▒▒▒ ░░▒▒▒▒▒ ░░░▒▒▒▒ ░░░░▒▒▒ ░░░░░▒▒ ░░░░░░▒"
+# Spinner symbols propeller
+SPINNER_SYMBOLS_PROPELLER="/ - \\ |"
+# Spinner symbols
+SPINNER_SYMBOLS=$SPINNER_SYMBOLS_PROPELLER
+# Spinner flag
+SPINNER_ENABLE=true
+
+# Spinner logic
+_spinner() {
+  # Termination flag
+  _terminate=false
+  # Termination signal
+  trap '_terminate=true' USR1
+  # Message
+  _spinner_message=${1:-""}
+
+  while :; do
+    # Cursor invisible
+    tput civis
+
+    for s in $SPINNER_SYMBOLS; do
+      # Save cursor position
+      tput sc
+      # Symbol and message
+      printf "%s %s" "$s" "$_spinner_message"
+      # Restore cursor position
+      tput rc
+
+      # Terminate
+      if [ "$_terminate" = true ]; then
+        # Clear line from position to end
+        tput el
+        break 2
+      fi
+
+      # Animation time
+      sleep "$SPINNER_TIME"
+
+      # Check parent still alive
+      # Parent PID
+      _spinner_ppid=$(ps -p "$$" -o ppid=)
+      if [ -n "$_spinner_ppid" ]; then
+        # shellcheck disable=SC2086
+        _spinner_parent_up=$(ps --no-headers $_spinner_ppid)
+        if [ -z "$_spinner_parent_up" ]; then break 2; fi
+      fi
+    done
+  done
+
+  # Cursor normal
+  tput cnorm
+  return 0
+}
+
+# Start spinner
+# @param $1 Message
+# shellcheck disable=SC2120
+spinner_start() {
+  _spinner_message=${1:-"Loading..."}
+  INFO "$_spinner_message"
+
+  [ "$SPINNER_ENABLE" = true ] || return 0
+  [ -z "$SPINNER_PID" ] || FATAL "Spinner PID ($SPINNER_PID) already defined"
+
+  # Spawn spinner process
+  _spinner "$_spinner_message" &
+  # Spinner process id
+  SPINNER_PID=$!
+}
+
+# Stop spinner
+spinner_stop() {
+  [ "$SPINNER_ENABLE" = true ] || return 0
+  [ -n "$SPINNER_PID" ] || FATAL "Spinner PID is undefined"
+
+  # Send termination signal
+  kill -s USR1 "$SPINNER_PID"
+  # Wait may fail
+  wait "$SPINNER_PID" || :
+  # Reset pid
+  SPINNER_PID=
+}
+
+# ================
+# ASSERT
+# ================
+# Assert command is installed
+# @param $1 Command name
+assert_cmd() {
+  check_cmd "$1" || FATAL "Command '$1' not found"
+  DEBUG "Command '$1' found at '$(command -v "$1")'"
+}
+
+# Assert spinner
+assert_spinner() {
+  [ "$SPINNER_ENABLE" = true ] || return 0
+
+  assert_cmd ps
+  assert_cmd tput
+}
+
+# Assert Docker image
+# @param $1 Docker image
+# @param $2 Dockerfile
+# @param $3 Dockerfile context
+assert_docker_image() {
+  assert_cmd docker
+  _docker_image=$1
+  _dockerfile=${2:-}
+  _dockerfile_context=${3:-}
+
+  ! docker image inspect "$_docker_image" >/dev/null 2>&1 || {
+    DEBUG "Docker image '$_docker_image' found"
+    return 0
+  }
+
+  WARN "Docker image '$_docker_image' not found"
+
+  if [ -z "$_dockerfile" ]; then
+    INFO "Pulling Docker image '$_docker_image'"
+    docker pull "$_docker_image" || FATAL "Error pulling Docker image '$_docker_image'"
+  else
+    [ -n "$_dockerfile_context" ] || _dockerfile_context=$(dirname "$_dockerfile")
+    INFO "Building Docker image '$_docker_image' using Dockerfile '$_dockerfile' with context '$_dockerfile_context'"
+    docker build --rm -t "$_docker_image" -f "$_dockerfile" "$_dockerfile_context" || FATAL "Error building Docker image '$_docker_image'"
+  fi
+}
+
+# Assert executable downloader
+assert_downloader() {
+  [ -z "$DOWNLOADER" ] || return 0
+
+  _assert_downloader() {
+    # Return failure if it doesn't exist or is no executable
+    [ -x "$(command -v "$1")" ] || return 1
+
+    # Set downloader
+    DOWNLOADER=$1
+    return 0
+  }
+
+  # Downloader command
+  _assert_downloader curl ||
+    _assert_downloader wget ||
+    FATAL "No executable downloader found: 'curl' or 'wget'"
+  DEBUG "Downloader '$DOWNLOADER' found at '$(command -v "$DOWNLOADER")'"
+}
+
+# Assert URL is reachable
+# @param $1 URL address
+# @param $2 Timeout in seconds
+assert_url_reachability() {
+  assert_downloader
+
+  # URL address
+  _url_address=$1
+  # Timeout in seconds
+  _timeout=${2:-10}
+
+  DEBUG "Testing URL '$_url_address' reachability"
+  case $DOWNLOADER in
+  curl)
+    curl --fail --silent --show-error --max-time "$_timeout" "$_url_address" >/dev/null || FATAL "URL address '$_url_address' is unreachable"
+    ;;
+  wget)
+    wget --quiet --spider --timeout="$_timeout" --tries=1 "$_url_address" 2>&1 || FATAL "URL address '$_url_address' is unreachable"
+    ;;
+  *) FATAL "Unknown downloader '$DOWNLOADER'" ;;
+  esac
+}
+
+# ================
+# CLEANUP
+# ================
+# Cleanup spinner
+cleanup_spinner() {
+  { [ "$SPINNER_ENABLE" = true ] && [ -n "$SPINNER_PID" ]; } || return 0
+
+  DEBUG "Resetting cursor"
+  tput rc
+  tput cnorm
+  SPINNER_ENABLE=
+  SPINNER_PID=
+}
+
+# Cleanup Docker container
+# @param $1 Container id
+cleanup_docker_container() {
+  { [ -n "$1" ] && check_cmd docker; } || return 0
+
+  _container_id=$1
+  DEBUG "Stopping Docker container '$_container_id'"
+  docker stop "$_container_id" >/dev/null 2>&1 || return 0
+  DEBUG "Removing Docker container '$_container_id'"
+  docker rm "$_container_id" >/dev/null 2>&1 || return 0
+}
+
+# Cleanup directory
+# @param $1 Directory path
+cleanup_dir() {
+  { [ -n "$1" ] && [ -d "$1" ]; } || return 0
+
+  DEBUG "Removing directory '$1'"
+  rm -rf "$1" || return 0
+}
+
+# ================
+# FUNCTIONS
+# ================
+# Check command is installed
+# @param $1 Command name
+check_cmd() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+# Parse URL address
+# @param $1 URL address
+parse_url() {
+  assert_cmd cut
+  assert_cmd grep
+  assert_cmd sed
+
+  # Protocol
+  _url_proto=$(printf '%s\n' "$1" | sed 's,^\(.*://\).*,\1,')
+  # Remove protocol
+  _url=$(printf '%s\n' "$1" | sed "s,$_url_proto,,")
+  # User
+  _url_user=$(printf '%s\n' "$_url" | cut -d@ -f1 | cut -d: -f1)
+  # Password
+  _url_password=$(printf '%s\n' "$_url" | cut -d@ -f1 | cut -d: -f2)
+  # Host
+  _url_host=$(printf '%s\n' "$_url" | sed "s,$_url_user@,," | cut -d/ -f1 | sed 's,:.*,,')
+  # Port
+  _url_port=$(printf '%s\n' "$_url" | sed "s,$_url_user@,," | cut -d/ -f1 | sed -e 's,^.*:,:,' -e 's,.*:\([0-9]*\).*,\1,' -e 's,[^0-9],,')
+  # Path
+  _url_path=$(printf '%s\n' "$_url" | cut -d/ -f2-)
+
+  # Return
+  RETVAL=$(
+    jq \
+      --null-input \
+      --arg url "$_url" \
+      --arg proto "$_url_proto" \
+      --arg user "$_url_user" \
+      --arg password "$_url_password" \
+      --arg host "$_url_host" \
+      --arg port "$_url_port" \
+      --arg path "$_url_path" \
+      '
+        {
+          "url": $url,
+          "proto": $proto,
+          "user": $user,
+          "password": $password,
+          "host": $host,
+          "port": $port,
+          "path": $path
+        }
+      '
+  )
+}
+
+# Download a file
+# @param $1 Output location
+# @param $2 Download URL
+download() {
+  assert_downloader
+
+  # Download
+  DEBUG "Downloading file '$2' to '$1'"
+  case $DOWNLOADER in
+  curl)
+    curl --fail --silent --location --output "$1" "$2" || FATAL "Download file '$2' failed"
+    ;;
+  wget)
+    wget --quiet --output-document="$1" "$2" || FATAL "Download file '$2' failed"
+    ;;
+  *) FATAL "Unknown downloader '$DOWNLOADER'" ;;
+  esac
+
+  DEBUG "Successfully downloaded file '$2' to '$1'"
+}
+
+# Print downloaded content
+# @param $1 Download URL
+download_print() {
+  assert_downloader >/dev/null
+
+  # Download
+  case $DOWNLOADER in
+  curl)
+    curl --fail --silent --location --show-error "$1" || FATAL "Download print '$1' failed"
+    ;;
+  wget)
+    wget --quiet --output-document=- "$1" 2>&1 || FATAL "Download print '$1' failed"
+    ;;
+  *) FATAL "Unknown downloader '$DOWNLOADER'" ;;
+  esac
+}
+
+# Remove and create directory
+# @param $1 Directory path
+recreate_dir() {
+  _dir=$1
+  DEBUG "Recreating directory '$_dir'"
+
+  if [ -d "$_dir" ]; then
+    WARN "Removing directory '$_dir'"
+    rm -rf "$_dir" || FATAL "Error removing directory '$_dir'"
+  fi
+
+  INFO "Creating directory '$_dir'"
+  mkdir -p "$_dir" || FATAL "Error creating directory '$_dir'"
+}
+
+# Check if value is an integer number
+# @param $1 Value
+is_integer() {
+  [ -n "$1" ] || return 1
+
+  case $1 in
+  '' | *[!0-9]*) return 1 ;;
+  *) return 0 ;;
+  esac
+}
+
+# Git files
+# @param $1 Git directory
+git_files() {
+  assert_cmd basename
+  assert_cmd git
+  assert_cmd jq
+
+  _dir=$1
+  # Append .git if not present
+  [ "$(basename "$_dir")" = .git ] || _dir="$_dir/.git"
+
+  DEBUG "Git files in '$_dir' Git directory"
+
+  # Check if directory
+  [ -d "$_dir" ] || FATAL "Directory '$_dir' does not exists"
+
+  # Git files
+  _git_files=$(
+    git --git-dir "$_dir" ls-files --cached --others --exclude-standard --full-name |
+      jq --raw-input --null-input '[inputs | select(length > 0)]'
+  ) || FATAL "Error Git files in '$_dir' Git directory"
+
+  # Return
+  # shellcheck disable=2034
+  RETVAL=$_git_files
+}
+
+# Check if directory in git
+# @param $1 Git files
+# @param $2 Directory
+git_has_directory() {
+  assert_cmd jq
+
+  _git_files=$1
+  _dir=$2
+
+  DEBUG "Checking Git has directory '$_dir'"
+  [ "$(printf '%s\n' "$_git_files" | jq --raw-output --arg dir "$_dir" 'any(.[]; startswith($dir))')" = true ]
+
+  return $?
+}
+
+# Check if file in git
+# @param $1 Git files
+# @param $2 File
+git_has_file() {
+  assert_cmd jq
+
+  _git_files=$1
+  _file=$2
+
+  DEBUG "Checking Git has file '$_file'"
+  [ "$(printf '%s\n' "$_git_files" | jq --raw-output --arg file "$_file" 'any(.[]; . == $file)')" = true ]
+
+  return $?
+}
+
+# ================
+# CONFIGURATION
+# ================
+# Help usage string
+# shellcheck disable=2034
+HELP_COMMONS_USAGE=$(
+  cat <<EOF
+Usage commons: $(basename "$0") [--disable-color] [--disable-spinner] [--log-level <LEVEL>] [--spinner <SPINNER>]
+EOF
+)
+# Help options string
+# shellcheck disable=2034
+HELP_COMMONS_OPTIONS=$(
+  cat <<EOF
+Options commons:
+  --disable-color      Disable color
+
+  --disable-spinner    Disable spinner
+
+  --log-level <LEVEL>  Logger level
+                       Default: $(to_log_level_name "$LOG_LEVEL")
+                       Values:
+                         fatal    Fatal level
+                         error    Error level
+                         warn     Warning level
+                         info     Informational level
+                         debug    Debug level
+
+  --spinner <SPINNER>  Spinner
+                       Default: propeller
+                       Values:
+                         dots         Dots spinner
+                         grayscale    Grayscale spinner
+                         propeller    Propeller spinner
+EOF
+)
+# Log level
+LOG_LEVEL=$LOG_LEVEL_INFO
+# Log color flag
+LOG_COLOR_ENABLE=true
+# Spinner symbols
+SPINNER_SYMBOLS=$SPINNER_SYMBOLS_PROPELLER
+# Spinner flag
+SPINNER_ENABLE=true
 
 # ================
 # CONFIGURATION
@@ -113,6 +779,14 @@ cleanup() {
 
   # Cleanup temporary directory
   cleanup_dir "$TMP_DIR"
+
+  ############################
+
+  # Cleanup sysbench compiling tmp directory
+  cleanup_dir "$_sysbench_tmp_directory"
+
+  ###########################
+
   # Cleanup spinner
   cleanup_spinner
 
@@ -127,7 +801,7 @@ trap cleanup INT QUIT TERM EXIT
 # ================
 # Show help message
 show_help() {
-  cat << EOF
+  cat <<EOF
 Usage: $(basename "$0") [--admin-username <USERNAME>] [--admin-password <PASSWORD>] [--airgap]
         [--autoscaler-username <USERNAME>] [--autoscaler-password <PASSWORD>] [--autoscaler-version <VERSION>]
         [--bench-time <TIME>] [--certs-dir <DIR>] [--config-file <FILE>] [--help]
@@ -187,7 +861,7 @@ Options:
   --help                              Show this help message and exit
 
   --init-cluster                      Initialize cluster components and logic
-                                      Enable only when bootstrapping for the first time
+                                        Enable only when bootstrapping for the first time
 
   --k3s-config-file <FILE>            K3s configuration file
                                       Default: $K3S_CONFIG_FILE
@@ -268,7 +942,7 @@ assert_init_system() {
   if [ -x /sbin/openrc-run ]; then
     # OpenRC
     INIT_SYSTEM=openrc
-  elif [ -x /bin/systemctl ] || type systemctl > /dev/null 2>&1; then
+  elif [ -x /bin/systemctl ] || type systemctl >/dev/null 2>&1; then
     # systemd
     INIT_SYSTEM=systemd
   fi
@@ -295,7 +969,7 @@ assert_timezone() {
 
 # Assert user
 assert_user() {
-  id "$USER" > /dev/null 2>&1 || FATAL "User '$USER' does not exists"
+  id "$USER" >/dev/null 2>&1 || FATAL "User '$USER' does not exists"
 }
 
 # Home directory of user
@@ -303,8 +977,8 @@ user_home_dir() {
   _home_dir=
 
   case $USER in
-    root) _home_dir="/root" ;;
-    *) _home_dir="/home/$USER" ;;
+  root) _home_dir="/root" ;;
+  *) _home_dir="/home/$USER" ;;
   esac
 
   printf '%s\n' "$_home_dir"
@@ -315,7 +989,7 @@ create_uninstall() {
   _uninstall_script_file="/usr/local/bin/recluster.uninstall.sh"
 
   INFO "Creating uninstall script '$_uninstall_script_file'"
-  $SUDO tee "$_uninstall_script_file" > /dev/null << EOF
+  $SUDO tee "$_uninstall_script_file" >/dev/null <<EOF
 #!/usr/bin/env sh
 
 [ \$(id -u) -eq 0 ] || exec sudo \$0 \$@
@@ -420,8 +1094,8 @@ setup_ssh() {
   }
   while read -r _ssh_authorized_key; do
     INFO "Copying SSH authorized key '$_ssh_authorized_key' to SSH authorized keys '$_ssh_authorized_keys_file'"
-    printf "%s\n" "$_ssh_authorized_key" | $SUDO tee -a "$_ssh_authorized_keys_file" > /dev/null || FATAL "Error copying SSH authorized key '$_ssh_authorized_key' to SSH authorized keys '$_ssh_authorized_keys_file'"
-  done << EOF
+    printf "%s\n" "$_ssh_authorized_key" | $SUDO tee -a "$_ssh_authorized_keys_file" >/dev/null || FATAL "Error copying SSH authorized key '$_ssh_authorized_key' to SSH authorized keys '$_ssh_authorized_keys_file'"
+  done <<EOF
 $(cat "$SSH_AUTHORIZED_KEYS_FILE")
 EOF
   $SUDO chown "$USER:$USER" "$_ssh_authorized_keys_file"
@@ -429,15 +1103,15 @@ EOF
 
   # Restart SSH service
   case $INIT_SYSTEM in
-    openrc)
-      INFO "openrc: Restarting SSH"
-      $SUDO rc-service sshd restart
-      ;;
-    systemd)
-      INFO "systemd: Restarting SSH"
-      $SUDO systemctl restart ssh
-      ;;
-    *) FATAL "Unknown init system '$INIT_SYSTEM'" ;;
+  openrc)
+    INFO "openrc: Restarting SSH"
+    $SUDO rc-service sshd restart
+    ;;
+  systemd)
+    INFO "systemd: Restarting SSH"
+    $SUDO systemctl restart ssh
+    ;;
+  *) FATAL "Unknown init system '$INIT_SYSTEM'" ;;
   esac
 
   spinner_stop
@@ -496,13 +1170,10 @@ setup_certificates() {
 
 # Read interfaces
 read_interfaces() {
-  ip -details -json link show \
-    | jq \
+  ip -details -json link show |
+    jq '
+        map(select((.linkinfo.info_kind // .link_type) != "loopback") | {address, name: .ifname})
       '
-          map(if .linkinfo.info_kind // .link_type == "loopback" then empty else . end)
-          | map(.name = .ifname)
-          | map({address, name})
-        '
 }
 
 # Read power consumption
@@ -545,8 +1216,8 @@ read_power_consumption() {
 
   # Calculate mean
   _mean=$(
-    printf '%s\n' "$_pcs" \
-      | jq \
+    printf '%s\n' "$_pcs" |
+      jq \
         --raw-output \
         '
           add / length
@@ -559,8 +1230,8 @@ read_power_consumption() {
 
   # Calculate standard deviation
   _standard_deviation=$(
-    printf '%s\n' "$_pcs" \
-      | jq \
+    printf '%s\n' "$_pcs" |
+      jq \
         --raw-output \
         '
           (add / length) as $mean
@@ -629,29 +1300,29 @@ send_server_request() {
   # Send request
   DEBUG "Sending server request data to '$_server_url':" "$_req_data"
   case $DOWNLOADER in
-    curl)
-      _res_data=$(
-        curl --fail --silent --location --show-error \
-          --request POST \
-          --header 'Content-Type: application/json' \
-          --data "$_req_data" \
-          --url "$_server_url"
-      ) || FATAL "Error sending server request to '$_server_url'"
-      ;;
-    wget)
-      _res_data=$(
-        wget --quiet --output-document=- \
-          --header='Content-Type: application/json' \
-          --post-data="$_req_data" \
-          "$_server_url" 2>&1
-      ) || FATAL "Error sending server request to '$_server_url'"
-      ;;
-    *) FATAL "Unknown downloader '$DOWNLOADER'" ;;
+  curl)
+    _res_data=$(
+      curl --fail --silent --location --show-error \
+        --request POST \
+        --header 'Content-Type: application/json' \
+        --data "$_req_data" \
+        --url "$_server_url"
+    ) || FATAL "Error sending server request to '$_server_url'"
+    ;;
+  wget)
+    _res_data=$(
+      wget --quiet --output-document=- \
+        --header='Content-Type: application/json' \
+        --post-data="$_req_data" \
+        "$_server_url" 2>&1
+    ) || FATAL "Error sending server request to '$_server_url'"
+    ;;
+  *) FATAL "Unknown downloader '$DOWNLOADER'" ;;
   esac
   DEBUG "Received server response data from '$_server_url':" "$_res_data"
 
   # Check error response
-  if printf '%s\n' "$_res_data" | jq --exit-status 'has("errors")' > /dev/null 2>&1; then
+  if printf '%s\n' "$_res_data" | jq --exit-status 'has("errors")' >/dev/null 2>&1; then
     FATAL "Server '$_server_url' response data error:" "$_res_data"
   fi
 
@@ -755,8 +1426,8 @@ sign_in_server_user() {
 # Read CPU information
 read_cpu_info() {
   _cpu_info=$(
-    lscpu --json \
-      | jq \
+    lscpu --json |
+      jq \
         '
           .lscpu
           | map({(.field): .data})
@@ -783,18 +1454,18 @@ read_cpu_info() {
   # Convert architecture
   _architecture=$(printf '%s\n' "$_cpu_info" | jq --raw-output '.architecture')
   case $_architecture in
-    x86_64) _architecture=amd64 ;;
-    aarch64) _architecture=arm64 ;;
-    *) FATAL "CPU architecture '$_architecture' is not supported" ;;
+  x86_64) _architecture=amd64 ;;
+  aarch64) _architecture=arm64 ;;
+  *) FATAL "CPU architecture '$_architecture' is not supported" ;;
   esac
   [ "$_architecture" = "$ARCH" ] || FATAL "CPU architecture '$_architecture' does not match architecture '$ARCH'"
 
   # Convert vendor
   _vendor=$(printf '%s\n' "$_cpu_info" | jq --raw-output '.vendor')
   case $_vendor in
-    AuthenticAMD) _vendor=amd ;;
-    GenuineIntel) _vendor=intel ;;
-    *) FATAL "CPU vendor '$_vendor' not supported" ;;
+  AuthenticAMD) _vendor=amd ;;
+  GenuineIntel) _vendor=intel ;;
+  *) FATAL "CPU vendor '$_vendor' not supported" ;;
   esac
 
   # Convert cache to bytes
@@ -805,8 +1476,8 @@ read_cpu_info() {
 
   # Update
   _cpu_info=$(
-    printf '%s\n' "$_cpu_info" \
-      | jq \
+    printf '%s\n' "$_cpu_info" |
+      jq \
         --arg architecture "$_architecture" \
         --arg vendor "$_vendor" \
         --arg cachel1d "$_cache_l1d" \
@@ -830,10 +1501,10 @@ read_cpu_info() {
 # Read memory information
 read_memory_info() {
   _memory_info=$(
-    grep MemTotal /proc/meminfo \
-      | sed -e 's/MemTotal://g' -e 's/[[:space:]]*//g' -e 's/B.*//' \
-      | tr '[:lower:]' '[:upper:]' \
-      | numfmt --from iec
+    grep MemTotal /proc/meminfo |
+      sed -e 's/MemTotal://g' -e 's/[[:space:]]*//g' -e 's/B.*//' |
+      tr '[:lower:]' '[:upper:]' |
+      numfmt --from iec
   )
 
   # Return
@@ -843,8 +1514,8 @@ read_memory_info() {
 # Read storage(s) information
 read_storages_info() {
   _storages_info=$(
-    lsblk --bytes --json \
-      | jq \
+    lsblk --bytes --json |
+      jq \
         '
           .blockdevices
           | map(select((.type == "disk") and (.rm == false)))
@@ -858,39 +1529,42 @@ read_storages_info() {
 
 # Read interface(s) information
 read_interfaces_info() {
+
   _interfaces_info=$(read_interfaces)
 
   # Cycle interfaces to obtain additional information
   while read -r _interface; do
     # Name
     _iname=$(printf '%s\n' "$_interface" | jq --raw-output '.name')
-    # Speed
-    _speed=
-    # WoL
-    _wol=""
 
-    if [ ! -d "/sys/class/net/$_iname/wireless" ]; then
-      # Wired interface
-      _speed=$($SUDO ethtool "$_iname" | grep 'Speed' | sed -e 's/Speed://g' -e 's/[[:space:]]*//g' -e 's/b.*//' | numfmt --from=si)
-      _wol=$($SUDO ethtool "$_iname" | grep 'Supports Wake-on' | sed -e 's/Supports Wake-on://g' -e 's/[[:space:]]*//g')
+    # Speed
+    _speed=$($SUDO ethtool "$_iname" | grep Speed | sed -e 's/Speed://g' -e 's/[[:space:]]*//g' -e 's/b.*//')
+    if [ -z "$_speed" ] || [ "$_speed" = "Unknown!" ]; then
+      _speed=0
+    elif [[ $_speed =~ [0-9]+[MG] ]]; then
+      # Se _speed è nel formato '1000M' o '1G', estrai il numero
+      _speed=$(echo $_speed | sed -e 's/[MG]//')
     else
-      # Wireless interface
-      _speed_tx=$($SUDO iwctl station "$_iname" show | grep 'TxBitrate' | sed -e 's/TxBitrate//g' -e 's/[[:space:]]*//g' -e 's/b.*//' | numfmt --from=si)
-      _speed_rx=$($SUDO iwctl station "$_iname" show | grep 'RxBitrate' | sed -e 's/RxBitrate//g' -e 's/[[:space:]]*//g' -e 's/b.*//' | numfmt --from=si)
-      _speed=$((_speed = _speed_tx + _speed_rx))
-      _speed=$((_speed = _speed / 2))
+      echo "Errore nella riga $LINENO: Il formato di speed '$_speed' non è valido."
+      _speed=0
+    fi
+    # WoL
+    _wol=$($SUDO ethtool "$_iname" | grep 'Supports Wake-on' | sed -e 's/Supports Wake-on://g' -e 's/[[:space:]]*//g')
+    if [ -z "$_wol" ]; then
+      _wol='d'
     fi
 
     # Update interfaces
     _interfaces_info=$(
-      printf '%s\n' "$_interfaces_info" \
-        | jq \
+      printf '%s\n' "$_interfaces_info" |
+        jq \
           --arg iname "$_iname" \
           --arg speed "$_speed" \
           --arg wol "$_wol" \
           'map(if .name == $iname then . + {"speed": $speed | tonumber, "wol": ($wol | split(""))} else . end)'
     )
-  done << EOF
+
+  done <<EOF
 $(printf '%s\n' "$_interfaces_info" | jq --compact-output '.[]')
 EOF
 
@@ -898,13 +1572,133 @@ EOF
   RETVAL=$_interfaces_info
 }
 
+##########################################################################################################################
+
+###Compile Sysbench
+
+## Adding dependencies
+
+# List of required packages for sysbench compiling
+_sysbench_packages="g++ autoconf make automake libtool pkgconfig libaio-dev"
+
+# Package add method
+add_package() {
+  package_name="$1"
+
+  # Verify if the package is already present
+  if apk info "$package_name" >/dev/null 2>&1; then
+    echo "The package $package_name is already installed."
+  else
+    # Installthe package
+    apk add "$package_name"
+
+    # Verify the installation result
+    if [ $? -eq 0 ]; then
+      echo "The package $package_name has been succesflly installed."
+    else
+      echo "Error while installing the package $package_name. Exiting ..."
+      exit 1
+    fi
+  fi
+}
+
+if ! sysbench --help >/dev/null; then
+
+  DEBUG "Sysbench not present or not working (not compatible pre compiled version installed)."
+
+  # Remove already present precompiled version of sysbench
+
+  apk del sysbench
+
+  # Install all the required packages
+  for package in $_sysbench_packages; do
+    add_package "$package"
+  done
+
+  # Update apk database
+  apk update
+
+  # Clean apk cache
+  apk cache clean
+
+  echo "Require packages installation process is completed."
+
+  # Sysbench arechive
+  _sysbench_archive_name="./dependencies/sysbench.tar.gz"
+
+  # Specifying tmp drectory
+  _sysbench_tmp_directory="./dependencies/sysbench_tmp"
+
+  # Main current installation directory
+
+  _main_install_directory=$(pwd)
+
+  # Create tmp directory
+
+  mkdir ./dependencies/sysbench_tmp
+
+  # Extracting the sysbench archive
+
+  tar -xzf "$_sysbench_archive_name" -C "$_sysbench_tmp_directory" || {
+    echo "Error while extracting the sysbench archive."
+    exit 1
+  }
+
+  # Find the extracted subdirectory
+
+  _subdirectory_name=$(tar -tf "$_sysbench_archive_name" | head -n 1 | cut -d '/' -f 1)
+
+  # Going into the sysbench tmp directory.
+
+  if ! cd "$_sysbench_tmp_directory/$_subdirectory_name"; then
+    FATAL "Could not get into sysbench installation directory."
+    exit 1
+  fi
+
+  # Autogen
+
+  if ! ./autogen.sh >/dev/null; then
+    FATAL "Error in running sysbench autogen script."
+    exit 1
+  fi
+
+  # Configure
+
+  if ! ./configure --without-mysql >/dev/null; then
+    FATAL "Error in running sysbench configure script."
+    exit 1
+  fi
+
+  # Make
+
+  if ! make -j >/dev/null; then
+    FATAL "Error in running sysbench make script."
+    exit 1
+  fi
+
+  # Install
+
+  if ! make install >/dev/null; then
+    FATAL "Error in running sysbench install script."
+    exit 1
+  fi
+
+  cd "$_main_install_directory"
+
+  INFO "Sysbench compiling and installation completed"
+else
+  INFO "Sysbench is present and working."
+fi
+
+#################################################################################################################################
+
 # Execute CPU benchmark
 run_cpu_bench() {
   _run_cpu_bench() {
-    sysbench --time="$BENCH_TIME" --threads="$1" cpu run \
-      | grep 'events per second' \
-      | sed -e 's/events per second://g' -e 's/[[:space:]]*//g' \
-      | xargs printf "%.0f"
+    sysbench --time="$BENCH_TIME" --threads="$1" cpu run |
+      grep 'events per second' |
+      sed -e 's/events per second://g' -e 's/[[:space:]]*//g' |
+      xargs printf "%.0f"
   }
   _threads=$(grep -c ^processor /proc/cpuinfo)
 
@@ -936,10 +1730,10 @@ run_cpu_bench() {
 # Execute memory benchmark
 run_memory_bench() {
   _run_memory_bench() {
-    _memory_output=$(sysbench --time="$BENCH_TIME" --memory-oper="$1" --memory-access-mode="$2" memory run \
-      | grep 'transferred' \
-      | sed -e 's/.*(\(.*\))/\1/' -e 's/B.*//' -e 's/[[:space:]]*//g' \
-      | numfmt --from=iec-i)
+    _memory_output=$(sysbench --time="$BENCH_TIME" --memory-oper="$1" --memory-access-mode="$2" memory run |
+      grep 'transferred' |
+      sed -e 's/.*(\(.*\))/\1/' -e 's/B.*//' -e 's/[[:space:]]*//g' |
+      numfmt --from=iec-i)
     printf '%s\n' $((_memory_output * 8))
   }
 
@@ -991,13 +1785,13 @@ run_storages_bench() {
     # Io operation
     _io_opt=
     case $1 in
-      read) _io_opt=$1 ;;
-      write)
-        _io_opt=written
-        # Prepare write benchmark
-        sysbench fileio cleanup > /dev/null
-        sysbench fileio prepare > /dev/null
-        ;;
+    read) _io_opt=$1 ;;
+    write)
+      _io_opt=written
+      # Prepare write benchmark
+      sysbench fileio cleanup >/dev/null
+      sysbench fileio prepare >/dev/null
+      ;;
     esac
 
     _io_output=$(sysbench --time="$BENCH_TIME" --file-test-mode="$2" --file-io-mode="$3" fileio run | grep "$_io_opt, ")
@@ -1012,8 +1806,8 @@ run_storages_bench() {
 
   # Prepare read benchmark
   DEBUG "Preparing storage(s) read benchmark"
-  sysbench fileio cleanup > /dev/null
-  sysbench fileio prepare > /dev/null
+  sysbench fileio cleanup >/dev/null
+  sysbench fileio prepare >/dev/null
 
   # Read sequential synchronous
   DEBUG "Running storage(s) benchmark in read sequential synchronous"
@@ -1057,7 +1851,7 @@ run_storages_bench() {
 
   # Clean
   DEBUG "Cleaning storage(s) benchmark"
-  sysbench fileio cleanup > /dev/null
+  sysbench fileio cleanup >/dev/null
 
   # Return
   RETVAL=$(
@@ -1101,7 +1895,7 @@ run_storages_bench() {
 # Read CPU power consumption
 read_cpu_power_consumption() {
   _run_cpu_bench() {
-    sysbench --time=0 --threads="$1" cpu run > /dev/null &
+    sysbench --time=0 --threads="$1" cpu run >/dev/null &
     read_power_consumption "$!"
   }
   _threads=$(grep -c ^processor /proc/cpuinfo)
@@ -1147,7 +1941,7 @@ wait_k8s_reachability() {
   DEBUG "Waiting K8s control plane reachability"
   _wait_k8s_max_attempts=$_wait_k8s_max_attempts_default
   while [ "$_wait_k8s_max_attempts" -gt 0 ]; do
-    if $SUDO kubectl cluster-info > /dev/null 2>&1; then
+    if $SUDO kubectl cluster-info >/dev/null 2>&1; then
       DEBUG "K8s control plane is reachable"
       break
     fi
@@ -1196,7 +1990,7 @@ wait_database_reachability() {
 
   INFO "Waiting database reachability"
   while [ "$_wait_database_max_attempts" -gt 0 ]; do
-    if $SUDO su postgres -c "pg_isready" > /dev/null 2>&1; then
+    if $SUDO su postgres -c "pg_isready" >/dev/null 2>&1; then
       DEBUG "Database is reachable"
       break
     fi
@@ -1216,7 +2010,7 @@ wait_server_reachability() {
 
   INFO "Waiting server reachability"
   while [ "$_wait_server_max_attempts" -gt 0 ]; do
-    if (assert_url_reachability "$_server_url/health" > /dev/null 2>&1); then
+    if (assert_url_reachability "$_server_url/health" >/dev/null 2>&1); then
       DEBUG "Server is reachable"
       break
     fi
@@ -1284,182 +2078,182 @@ parse_args() {
     _shifts=1
 
     case $1 in
-      --admin-username)
-        # Admin username
-        parse_args_assert_value "$@"
+    --admin-username)
+      # Admin username
+      parse_args_assert_value "$@"
 
-        ADMIN_USERNAME=$2
-        _shifts=2
-        ;;
-      --admin-password)
-        # Admin password
-        parse_args_assert_value "$@"
+      ADMIN_USERNAME=$2
+      _shifts=2
+      ;;
+    --admin-password)
+      # Admin password
+      parse_args_assert_value "$@"
 
-        ADMIN_PASSWORD=$2
-        _shifts=2
-        ;;
-      --airgap)
-        # Airgap environment
-        AIRGAP_ENV=true
-        ;;
-      --autoscaler-username)
-        # Autoscaler username
-        parse_args_assert_value "$@"
+      ADMIN_PASSWORD=$2
+      _shifts=2
+      ;;
+    --airgap)
+      # Airgap environment
+      AIRGAP_ENV=true
+      ;;
+    --autoscaler-username)
+      # Autoscaler username
+      parse_args_assert_value "$@"
 
-        AUTOSCALER_USERNAME=$2
-        _shifts=2
-        ;;
-      --autoscaler-password)
-        # Autoscaler password
-        parse_args_assert_value "$@"
+      AUTOSCALER_USERNAME=$2
+      _shifts=2
+      ;;
+    --autoscaler-password)
+      # Autoscaler password
+      parse_args_assert_value "$@"
 
-        AUTOSCALER_PASSWORD=$2
-        _shifts=2
-        ;;
-      --autoscaler-version)
-        #Autoscaler version
-        parse_args_assert_value "$@"
+      AUTOSCALER_PASSWORD=$2
+      _shifts=2
+      ;;
+    --autoscaler-version)
+      #Autoscaler version
+      parse_args_assert_value "$@"
 
-        AUTOSCALER_VERSION=$2
-        _shifts=2
-        ;;
-      --bench-time)
-        # Benchmark time
-        parse_args_assert_value "$@"
-        parse_args_assert_positive_integer "$1" "$2"
+      AUTOSCALER_VERSION=$2
+      _shifts=2
+      ;;
+    --bench-time)
+      # Benchmark time
+      parse_args_assert_value "$@"
+      parse_args_assert_positive_integer "$1" "$2"
 
-        BENCH_TIME=$2
-        _shifts=2
-        ;;
-      --certs-dir)
-        # Certificates directory
-        parse_args_assert_value "$@"
+      BENCH_TIME=$2
+      _shifts=2
+      ;;
+    --certs-dir)
+      # Certificates directory
+      parse_args_assert_value "$@"
 
-        RECLUSTER_CERTS_DIR=$2
-        _shifts=2
-        ;;
-      --config-file)
-        # Configuration file
-        parse_args_assert_value "$@"
+      RECLUSTER_CERTS_DIR=$2
+      _shifts=2
+      ;;
+    --config-file)
+      # Configuration file
+      parse_args_assert_value "$@"
 
-        CONFIG_FILE=$2
-        _shifts=2
-        ;;
-      --help)
-        # Display help message and exit
-        show_help
-        exit 0
-        ;;
-      --init-cluster)
-        # Initialize cluster
-        INIT_CLUSTER=true
-        ;;
-      --k3s-config-file)
-        # K3s configuration file
-        parse_args_assert_value "$@"
+      CONFIG_FILE=$2
+      _shifts=2
+      ;;
+    --help)
+      # Display help message and exit
+      show_help
+      exit 0
+      ;;
+    --init-cluster)
+      # Initialize cluster
+      INIT_CLUSTER=true
+      ;;
+    --k3s-config-file)
+      # K3s configuration file
+      parse_args_assert_value "$@"
 
-        K3S_CONFIG_FILE=$2
-        _shifts=2
-        ;;
-      --k3s-registry-config-file)
-        # K3s registry configuration file
-        parse_args_assert_value "$@"
+      K3S_CONFIG_FILE=$2
+      _shifts=2
+      ;;
+    --k3s-registry-config-file)
+      # K3s registry configuration file
+      parse_args_assert_value "$@"
 
-        K3S_REGISTRY_CONFIG_FILE=$2
-        _shifts=2
-        ;;
-      --k3s-version)
-        # K3s version
-        parse_args_assert_value "$@"
+      K3S_REGISTRY_CONFIG_FILE=$2
+      _shifts=2
+      ;;
+    --k3s-version)
+      # K3s version
+      parse_args_assert_value "$@"
 
-        K3S_VERSION=$2
-        _shifts=2
-        ;;
-      --node-exporter-config-file)
-        # Node exporter configuration file
-        parse_args_assert_value "$@"
+      K3S_VERSION=$2
+      _shifts=2
+      ;;
+    --node-exporter-config-file)
+      # Node exporter configuration file
+      parse_args_assert_value "$@"
 
-        NODE_EXPORTER_CONFIG_FILE=$2
-        _shifts=2
-        ;;
-      --node-exporter-version)
-        # Node exporter version
-        parse_args_assert_value "$@"
+      NODE_EXPORTER_CONFIG_FILE=$2
+      _shifts=2
+      ;;
+    --node-exporter-version)
+      # Node exporter version
+      parse_args_assert_value "$@"
 
-        NODE_EXPORTER_VERSION=$2
-        _shifts=2
-        ;;
-      --pc-device-api)
-        # Power consumption device api url
-        parse_args_assert_value "$@"
+      NODE_EXPORTER_VERSION=$2
+      _shifts=2
+      ;;
+    --pc-device-api)
+      # Power consumption device api url
+      parse_args_assert_value "$@"
 
-        PC_DEVICE_API=$2
-        _shifts=2
-        ;;
-      --pc-interval)
-        # Power consumption interval
-        parse_args_assert_value "$@"
-        parse_args_assert_positive_integer "$1" "$2"
+      PC_DEVICE_API=$2
+      _shifts=2
+      ;;
+    --pc-interval)
+      # Power consumption interval
+      parse_args_assert_value "$@"
+      parse_args_assert_positive_integer "$1" "$2"
 
-        PC_INTERVAL=$2
-        _shifts=2
-        ;;
-      --pc-time)
-        # Power consumption time
-        parse_args_assert_value "$@"
-        parse_args_assert_positive_integer "$1" "$2"
+      PC_INTERVAL=$2
+      _shifts=2
+      ;;
+    --pc-time)
+      # Power consumption time
+      parse_args_assert_value "$@"
+      parse_args_assert_positive_integer "$1" "$2"
 
-        PC_TIME=$2
-        _shifts=2
-        ;;
-      --pc-warmup)
-        # Power consumption warmup time
-        parse_args_assert_value "$@"
-        parse_args_assert_positive_integer "$1" "$2"
+      PC_TIME=$2
+      _shifts=2
+      ;;
+    --pc-warmup)
+      # Power consumption warmup time
+      parse_args_assert_value "$@"
+      parse_args_assert_positive_integer "$1" "$2"
 
-        PC_WARMUP=$2
-        _shifts=2
-        ;;
-      --server-env-file)
-        # Server environment file
-        parse_args_assert_value "$@"
+      PC_WARMUP=$2
+      _shifts=2
+      ;;
+    --server-env-file)
+      # Server environment file
+      parse_args_assert_value "$@"
 
-        RECLUSTER_SERVER_ENV_FILE=$2
-        _shifts=2
-        ;;
-      --ssh-authorized-keys-file)
-        # SSH authorized keys file
-        parse_args_assert_value "$@"
+      RECLUSTER_SERVER_ENV_FILE=$2
+      _shifts=2
+      ;;
+    --ssh-authorized-keys-file)
+      # SSH authorized keys file
+      parse_args_assert_value "$@"
 
-        SSH_AUTHORIZED_KEYS_FILE=$2
-        _shifts=2
-        ;;
-      --ssh-config-file)
-        # SSH configuration file
-        parse_args_assert_value "$@"
+      SSH_AUTHORIZED_KEYS_FILE=$2
+      _shifts=2
+      ;;
+    --ssh-config-file)
+      # SSH configuration file
+      parse_args_assert_value "$@"
 
-        SSH_CONFIG_FILE=$2
-        _shifts=2
-        ;;
-      --sshd-config-file)
-        # SSH server configuration file
-        parse_args_assert_value "$@"
+      SSH_CONFIG_FILE=$2
+      _shifts=2
+      ;;
+    --sshd-config-file)
+      # SSH server configuration file
+      parse_args_assert_value "$@"
 
-        SSHD_CONFIG_FILE=$2
-        _shifts=2
-        ;;
-      --user)
-        # User
-        parse_args_assert_value "$@"
+      SSHD_CONFIG_FILE=$2
+      _shifts=2
+      ;;
+    --user)
+      # User
+      parse_args_assert_value "$@"
 
-        USER=$2
-        _shifts=2
-        ;;
-      *)
-        # Commons
-        parse_args_commons "$@"
-        _shifts=$RETVAL
-        ;;
+      USER=$2
+      _shifts=2
+      ;;
+    *)
+      # Commons
+      parse_args_commons "$@"
+      _shifts=$RETVAL
+      ;;
     esac
 
     # Shift arguments
@@ -1475,13 +2269,13 @@ verify_system() {
   # Architecture
   ARCH=$(uname -m)
   case $ARCH in
-    amd64 | x86_64) ARCH=amd64 ;;
-    arm64 | aarch64) ARCH=arm64 ;;
-    armv5*) ARCH=armv5 ;;
-    armv6*) ARCH=armv6 ;;
-    armv7*) ARCH=armv7 ;;
-    s390x) ARCH=s390x ;;
-    *) FATAL "Architecture '$ARCH' is not supported" ;;
+  amd64 | x86_64) ARCH=amd64 ;;
+  arm64 | aarch64) ARCH=arm64 ;;
+  armv5*) ARCH=armv5 ;;
+  armv6*) ARCH=armv6 ;;
+  armv7*) ARCH=armv7 ;;
+  s390x) ARCH=s390x ;;
+  *) FATAL "Architecture '$ARCH' is not supported" ;;
   esac
 
   # Commands
@@ -1594,8 +2388,8 @@ verify_system() {
   [ -f "$SSH_AUTHORIZED_KEYS_FILE" ] || FATAL "SSH authorized keys file '$SSH_AUTHORIZED_KEYS_FILE' does not exists"
   [ -s "$SSH_AUTHORIZED_KEYS_FILE" ] || FATAL "SSH authorized keys file '$SSH_AUTHORIZED_KEYS_FILE' is empty"
   while read -r _ssh_authorized_key; do
-    printf '%s\n' "$_ssh_authorized_key" | ssh-keygen -l -f - > /dev/null 2>&1 || FATAL "SSH authorized key '$_ssh_authorized_key' is not valid"
-  done << EOF
+    printf '%s\n' "$_ssh_authorized_key" | ssh-keygen -l -f - >/dev/null 2>&1 || FATAL "SSH authorized key '$_ssh_authorized_key' is not valid"
+  done <<EOF
 $(cat "$SSH_AUTHORIZED_KEYS_FILE")
 EOF
 
@@ -1650,17 +2444,17 @@ EOF
     _supports_wol=$($SUDO ethtool "$_iname" | grep 'Supports Wake-on' | sed -e 's/Supports Wake-on://g' -e 's/[[:space:]]*//g')
 
     case $_supports_wol in
-      *g*)
-        # WoL supported
-        _wol=$($SUDO ethtool "$_iname" | grep 'Wake-on' | grep -v 'Supports Wake-on' | sed -e 's/Wake-on://g' -e 's/[[:space:]]*//g')
-        [ "$_wol" != d ] || FATAL "Interface '$_iname' Wake-on-Lan is disabled"
-        ;;
-      *)
-        # WoL not supported
-        WARN "Interface '$_iname' does not support Wake-on-Lan"
-        ;;
+    *g*)
+      # WoL supported
+      _wol=$($SUDO ethtool "$_iname" | grep 'Wake-on' | grep -v 'Supports Wake-on' | sed -e 's/Wake-on://g' -e 's/[[:space:]]*//g')
+      [ "$_wol" != d ] || FATAL "Interface '$_iname' Wake-on-Lan is disabled"
+      ;;
+    *)
+      # WoL not supported
+      WARN "Interface '$_iname' does not support Wake-on-Lan"
+      ;;
     esac
-  done << EOF
+  done <<EOF
 $(printf '%s\n' "$_interfaces" | jq --compact-output '.[]')
 EOF
 }
@@ -1694,15 +2488,15 @@ setup_system() {
     DEBUG "Adding user '$USER' to group 'docker'"
     $SUDO addgroup "$USER" docker
     case $INIT_SYSTEM in
-      openrc)
-        INFO "openrc: Starting Docker service"
-        $SUDO rc-service docker restart
-        ;;
-      systemd)
-        INFO "systemd: Starting Docker service"
-        $SUDO systemctl restart docker
-        ;;
-      *) FATAL "Unknown init system '$INIT_SYSTEM'" ;;
+    openrc)
+      INFO "openrc: Starting Docker service"
+      $SUDO rc-service docker restart
+      ;;
+    systemd)
+      INFO "systemd: Starting Docker service"
+      $SUDO systemctl restart docker
+      ;;
+    *) FATAL "Unknown init system '$INIT_SYSTEM'" ;;
     esac
 
     spinner_stop
@@ -1721,23 +2515,23 @@ setup_system() {
     _k3s_bin_suffix=
     _k3s_images_suffix=
     case $ARCH in
-      amd64)
-        _k3s_bin_suffix=
-        _k3s_images_suffix=amd64
-        ;;
-      arm64)
-        _k3s_bin_suffix=-arm64
-        _k3s_images_suffix=arm64
-        ;;
-      arm*)
-        _k3s_bin_suffix=-armhf
-        _k3s_images_suffix=arm
-        ;;
-      s390x)
-        _k3s_bin_suffix=-s390x
-        _k3s_images_suffix=s390x
-        ;;
-      *) FATAL "Unknown architecture '$ARCH'" ;;
+    amd64)
+      _k3s_bin_suffix=
+      _k3s_images_suffix=amd64
+      ;;
+    arm64)
+      _k3s_bin_suffix=-arm64
+      _k3s_images_suffix=arm64
+      ;;
+    arm*)
+      _k3s_bin_suffix=-armhf
+      _k3s_images_suffix=arm
+      ;;
+    s390x)
+      _k3s_bin_suffix=-s390x
+      _k3s_images_suffix=s390x
+      ;;
+    *) FATAL "Unknown architecture '$ARCH'" ;;
     esac
 
     # General
@@ -1803,7 +2597,7 @@ read_system_info() {
   _storages_info_msg="Storage(s) found $(printf '%s\n' "$_storages_info" | jq --raw-output 'length'):"
   while read -r _storage_info; do
     _storages_info_msg="$_storages_info_msg\n\t'$(printf '%s\n' "$_storage_info" | jq --raw-output .name)' of '$(printf '%s\n' "$_storage_info" | jq --raw-output .size | numfmt --to=iec-i)B'"
-  done << EOF
+  done <<EOF
 $(printf '%s\n' "$_storages_info" | jq --compact-output '.[]')
 EOF
   INFO "$_storages_info_msg"
@@ -1819,8 +2613,8 @@ EOF
 
   # Update
   NODE_FACTS=$(
-    printf '%s\n' "$NODE_FACTS" \
-      | jq \
+    printf '%s\n' "$NODE_FACTS" |
+      jq \
         --argjson cpu "$_cpu_info" \
         --argjson memory "$_memory_info" \
         --argjson storages "$_storages_info" \
@@ -1862,8 +2656,8 @@ run_benchmarks() {
 
   # Update
   NODE_FACTS=$(
-    printf '%s\n' "$NODE_FACTS" \
-      | jq \
+    printf '%s\n' "$NODE_FACTS" |
+      jq \
         --argjson cpu "$_cpu_benchmark" \
         --argjson memory "$_memory_benchmark" \
         --argjson storages "$_storages_benchmark" \
@@ -1888,8 +2682,8 @@ read_power_consumptions() {
 
   # Update
   NODE_FACTS=$(
-    printf '%s\n' "$NODE_FACTS" \
-      | jq \
+    printf '%s\n' "$NODE_FACTS" |
+      jq \
         --argjson cpu "$_cpu_power_consumption" \
         '
           .minPowerConsumption = $cpu.idle.mean
@@ -1915,8 +2709,8 @@ finalize_node_facts() {
   DEBUG "Node roles:" "$_roles"
 
   NODE_FACTS=$(
-    printf '%s\n' "$NODE_FACTS" \
-      | jq \
+    printf '%s\n' "$NODE_FACTS" |
+      jq \
         --argjson roles "$_roles" \
         '
           .roles = $roles
@@ -1971,9 +2765,9 @@ install_k3s() {
   # Kind
   _kind=$(printf '%s\n' "$CONFIG" | jq --raw-output '.kind')
   case $_kind in
-    controller) _k3s_kind=server ;;
-    worker) _k3s_kind=agent ;;
-    *) FATAL "Unknown kind '$_kind'" ;;
+  controller) _k3s_kind=server ;;
+  worker) _k3s_kind=agent ;;
+  *) FATAL "Unknown kind '$_kind'" ;;
   esac
 
   # Etc directory
@@ -1981,10 +2775,10 @@ install_k3s() {
 
   # Write configuration
   INFO "Writing K3s configuration to '$_k3s_config_file'"
-  printf '%s\n' "$K3S_CONFIG" \
-    | yq e --no-colors --prettyPrint - \
-    | yq e --no-colors '(.. | select(tag == "!!str")) style="double"' - \
-    | $SUDO tee "$_k3s_config_file" > /dev/null
+  printf '%s\n' "$K3S_CONFIG" |
+    yq e --no-colors --prettyPrint - |
+    yq e --no-colors '(.. | select(tag == "!!str")) style="double"' - |
+    $SUDO tee "$_k3s_config_file" >/dev/null
   $SUDO chown root:root "$_k3s_config_file"
   $SUDO chmod 644 "$_k3s_config_file"
 
@@ -2045,8 +2839,8 @@ install_node_exporter() {
   # Configuration
   INFO "Writing Node exporter configuration"
   _node_exporter_config=$(
-    printf '%s\n' "$NODE_EXPORTER_CONFIG" \
-      | jq \
+    printf '%s\n' "$NODE_EXPORTER_CONFIG" |
+      jq \
         --raw-output \
         '
           .collector
@@ -2096,7 +2890,7 @@ cluster_init() {
 
       _k3s_kubeconfig_generated=false
       while [ "$_k3s_kubeconfig_generated" = false ]; do
-        read -r _dir _action _file << EOF
+        read -r _dir _action _file <<EOF
 $(inotifywait -e create,close_write,moved_to --quiet "$_k3s_kubeconfig_dir")
 EOF
         DEBUG "File '$_file' notify '$_action' at '$_dir'"
@@ -2110,21 +2904,21 @@ EOF
 
   # Start and stop K3s service to generate initial configuration
   case $INIT_SYSTEM in
-    openrc)
-      INFO "openrc: Starting K3s service"
-      $SUDO rc-service k3s-recluster start
-      _wait_k3s_kubeconfig_file_creation
-      INFO "openrc: Stopping K3s service"
-      $SUDO rc-service k3s-recluster stop
-      ;;
-    systemd)
-      INFO "systemd: Starting K3s service"
-      $SUDO systemctl start k3s-recluster
-      _wait_k3s_kubeconfig_file_creation
-      INFO "systemd: Stopping K3s service"
-      $SUDO systemctl stop k3s-recluster
-      ;;
-    *) FATAL "Unknown init system '$INIT_SYSTEM'" ;;
+  openrc)
+    INFO "openrc: Starting K3s service"
+    $SUDO rc-service k3s-recluster start
+    _wait_k3s_kubeconfig_file_creation
+    INFO "openrc: Stopping K3s service"
+    $SUDO rc-service k3s-recluster stop
+    ;;
+  systemd)
+    INFO "systemd: Starting K3s service"
+    $SUDO systemctl start k3s-recluster
+    _wait_k3s_kubeconfig_file_creation
+    INFO "systemd: Stopping K3s service"
+    $SUDO systemctl stop k3s-recluster
+    ;;
+  *) FATAL "Unknown init system '$INIT_SYSTEM'" ;;
   esac
 
   # Copy kubeconfig
@@ -2148,33 +2942,33 @@ EOF
 
   DEBUG "Stopping database"
   case $INIT_SYSTEM in
-    openrc) $SUDO rc-service postgresql stop > /dev/null 2>&1 || $SUDO rc-service postgresql zap > /dev/null 2>&1 || : ;;
-    systemd) $SUDO systemctl stop postgresql > /dev/null 2>&1 || $SUDO systemctl kill postgresql > /dev/null 2>&1 || : ;;
-    *) FATAL "Unknown init system '$INIT_SYSTEM'" ;;
+  openrc) $SUDO rc-service postgresql stop >/dev/null 2>&1 || $SUDO rc-service postgresql zap >/dev/null 2>&1 || : ;;
+  systemd) $SUDO systemctl stop postgresql >/dev/null 2>&1 || $SUDO systemctl kill postgresql >/dev/null 2>&1 || : ;;
+  *) FATAL "Unknown init system '$INIT_SYSTEM'" ;;
   esac
 
   DEBUG "Removing PostgreSQL data directory"
   $SUDO rm -rf /var/lib/postgresql
 
   case $INIT_SYSTEM in
-    openrc)
-      INFO "openrc: Creating PostgreSQL database cluster"
-      $SUDO rc-service postgresql setup
+  openrc)
+    INFO "openrc: Creating PostgreSQL database cluster"
+    $SUDO rc-service postgresql setup
 
-      INFO "openrc: Starting database"
-      $SUDO rc-service postgresql start
-      wait_database_reachability
-      ;;
-    systemd)
-      INFO "systemd: Creating PostgreSQL database cluster"
-      # TODO
-      FATAL "systemd: Creating PostgreSQL database cluster not implemented"
+    INFO "openrc: Starting database"
+    $SUDO rc-service postgresql start
+    wait_database_reachability
+    ;;
+  systemd)
+    INFO "systemd: Creating PostgreSQL database cluster"
+    # TODO
+    FATAL "systemd: Creating PostgreSQL database cluster not implemented"
 
-      INFO "systemd: Starting database"
-      $SUDO systemctl start postgresql
-      wait_database_reachability
-      ;;
-    *) FATAL "Unknown init system '$INIT_SYSTEM'" ;;
+    INFO "systemd: Starting database"
+    $SUDO systemctl start postgresql
+    wait_database_reachability
+    ;;
+  *) FATAL "Unknown init system '$INIT_SYSTEM'" ;;
   esac
 
   DEBUG "Removing database '$_database_db'"
@@ -2221,12 +3015,12 @@ EOF
   # Server service
   INFO "Constructing server service '$_server_service_name'"
   case $INIT_SYSTEM in
-    openrc)
-      _openrc_server_service_file="/etc/init.d/$_server_service_name"
-      _openrc_server_log_file="/var/log/$_server_service_name.log"
+  openrc)
+    _openrc_server_service_file="/etc/init.d/$_server_service_name"
+    _openrc_server_log_file="/var/log/$_server_service_name.log"
 
-      INFO "openrc: Constructing server service file '$_openrc_server_service_file'"
-      $SUDO tee $_openrc_server_service_file > /dev/null << EOF
+    INFO "openrc: Constructing server service file '$_openrc_server_service_file'"
+    $SUDO tee $_openrc_server_service_file >/dev/null <<EOF
 #!/sbin/openrc-run
 
 description="reCluster server"
@@ -2251,10 +3045,10 @@ set -o allexport
 source $_server_env_file
 set +o allexport
 EOF
-      $SUDO chown root:root $_openrc_server_service_file
-      $SUDO chmod 755 $_openrc_server_service_file
+    $SUDO chown root:root $_openrc_server_service_file
+    $SUDO chmod 755 $_openrc_server_service_file
 
-      $SUDO tee "/etc/logrotate.d/$_server_service_name" > /dev/null << EOF
+    $SUDO tee "/etc/logrotate.d/$_server_service_name" >/dev/null <<EOF
 $_openrc_server_log_file {
 	missingok
 	notifempty
@@ -2262,15 +3056,15 @@ $_openrc_server_log_file {
 }
 EOF
 
-      INFO "openrc: Starting server"
-      $SUDO rc-service recluster.server restart
-      wait_server_reachability
-      ;;
-    systemd)
-      _systemd_server_service_file="/etc/systemd/system/$_server_service_name.service"
+    INFO "openrc: Starting server"
+    $SUDO rc-service recluster.server restart
+    wait_server_reachability
+    ;;
+  systemd)
+    _systemd_server_service_file="/etc/systemd/system/$_server_service_name.service"
 
-      INFO "systemd: Constructing server service file '$_systemd_server_service_file'"
-      $SUDO tee $_systemd_server_service_file > /dev/null << EOF
+    INFO "systemd: Constructing server service file '$_systemd_server_service_file'"
+    $SUDO tee $_systemd_server_service_file >/dev/null <<EOF
 [Unit]
 Description=reCluster server
 After=network-online.target network.target
@@ -2293,16 +3087,16 @@ SyslogIdentifier=recluster.server
 [Install]
 WantedBy=multi-user.target
 EOF
-      $SUDO chown root:root $_systemd_server_service_file
-      $SUDO chmod 755 $_systemd_server_service_file
+    $SUDO chown root:root $_systemd_server_service_file
+    $SUDO chmod 755 $_systemd_server_service_file
 
-      $SUDO systemctl daemon-reload > /dev/null
+    $SUDO systemctl daemon-reload >/dev/null
 
-      INFO "systemd: Starting server"
-      $SUDO systemctl restart recluster.server
-      wait_server_reachability
-      ;;
-    *) FATAL "Unknown init system '$INIT_SYSTEM'" ;;
+    INFO "systemd: Starting server"
+    $SUDO systemctl restart recluster.server
+    wait_server_reachability
+    ;;
+  *) FATAL "Unknown init system '$INIT_SYSTEM'" ;;
   esac
 
   # Admin user
@@ -2343,11 +3137,11 @@ install_recluster() {
   spinner_start "Installing reCluster"
 
   # Write configuration
-  printf '%s\n' "$CONFIG" \
-    | jq '.recluster' \
-    | yq e --no-colors --prettyPrint - \
-    | yq e --no-colors '(.. | select(tag == "!!str")) style="double"' - \
-    | $SUDO tee "$_recluster_config_file" > /dev/null
+  printf '%s\n' "$CONFIG" |
+    jq '.recluster' |
+    yq e --no-colors --prettyPrint - |
+    yq e --no-colors '(.. | select(tag == "!!str")) style="double"' - |
+    $SUDO tee "$_recluster_config_file" >/dev/null
   $SUDO chown root:root "$_recluster_config_file"
   $SUDO chmod 600 "$_recluster_config_file"
 
@@ -2358,15 +3152,15 @@ install_recluster() {
   _node_id=$(printf '%s\n' "$_registration_data" | jq --raw-output '.decoded.payload.id')
 
   # Write node token
-  printf '%s\n' "$_node_token" | $SUDO tee "$_node_token_file" > /dev/null
+  printf '%s\n' "$_node_token" | $SUDO tee "$_node_token_file" >/dev/null
   $SUDO chown root:root "$_node_token_file"
   $SUDO chmod 600 "$_node_token_file"
 
   # K3s node name
   _kind=$(printf '%s\n' "$CONFIG" | jq --raw-output '.kind')
   case $_kind in
-    controller | worker) _node_name="$_kind.$_node_id" ;;
-    *) FATAL "Unknown kind '$_kind'" ;;
+  controller | worker) _node_name="$_kind.$_node_id" ;;
+  *) FATAL "Unknown kind '$_kind'" ;;
   esac
 
   # K3s label
@@ -2381,7 +3175,7 @@ install_recluster() {
   #
   # Commons script
   INFO "Constructing '$(basename "$_commons_script_file")' script"
-  $SUDO tee "$_commons_script_file" > /dev/null << EOF
+  $SUDO tee "$_commons_script_file" >/dev/null <<EOF
 #!/usr/bin/env sh
 
 # Fail on error
@@ -2472,8 +3266,8 @@ update_node_status() {
 EOF
 
   case $DOWNLOADER in
-    curl)
-      $SUDO tee -a "$_commons_script_file" > /dev/null << EOF
+  curl)
+    $SUDO tee -a "$_commons_script_file" >/dev/null <<EOF
       _response_data=\$(
         curl --fail --silent --location --show-error \\
           --request POST \\
@@ -2483,9 +3277,9 @@ EOF
           --data "\$_request_data"
       ) || FATAL "Error sending update node status request to '\$_server_url'"
 EOF
-      ;;
-    wget)
-      $SUDO tee -a "$_commons_script_file" > /dev/null << EOF
+    ;;
+  wget)
+    $SUDO tee -a "$_commons_script_file" >/dev/null <<EOF
       _response_data=\$(
         wget --quiet --output-document=- \\
           --header='Content-Type: application/json' \\
@@ -2494,11 +3288,11 @@ EOF
           "\$_server_url" 2>&1
       ) || FATAL "Error sending update node status request to '\$_server_url'"
 EOF
-      ;;
-    *) FATAL "Unknown downloader '$DOWNLOADER'" ;;
+    ;;
+  *) FATAL "Unknown downloader '$DOWNLOADER'" ;;
   esac
 
-  $SUDO tee -a "$_commons_script_file" > /dev/null << EOF
+  $SUDO tee -a "$_commons_script_file" >/dev/null <<EOF
   # Check error response
   if printf '%s\n' "\$_response_data" | jq --exit-status 'has("errors")' > /dev/null 2>&1; then
     FATAL "Error updating node status at '\$_server_url':\\n\$(printf '%s\n' "\$_response_data" | jq .)"
@@ -2518,20 +3312,20 @@ assert_url_reachability() {
 EOF
 
   case $DOWNLOADER in
-    curl)
-      $SUDO tee -a "$_commons_script_file" > /dev/null << EOF
+  curl)
+    $SUDO tee -a "$_commons_script_file" >/dev/null <<EOF
   curl --fail --silent --show-error --max-time "\$_timeout" "\$_url_address" > /dev/null || FATAL "URL address '\$_url_address' is unreachable"
 EOF
-      ;;
-    wget)
-      $SUDO tee -a "$_commons_script_file" > /dev/null << EOF
+    ;;
+  wget)
+    $SUDO tee -a "$_commons_script_file" >/dev/null <<EOF
   wget --quiet --spider --timeout="\$_timeout" --tries=1 "\$_url_address" 2>&1 || FATAL "URL address '\$_url_address' is unreachable"
 EOF
-      ;;
-    *) FATAL "Unknown downloader '$DOWNLOADER'" ;;
+    ;;
+  *) FATAL "Unknown downloader '$DOWNLOADER'" ;;
   esac
 
-  $SUDO tee -a "$_commons_script_file" > /dev/null << EOF
+  $SUDO tee -a "$_commons_script_file" >/dev/null <<EOF
 }
 
 # Wait database reachability
@@ -2590,9 +3384,9 @@ manage_services() {
 EOF
 
   case $INIT_SYSTEM in
-    openrc)
-      if [ "$INIT_CLUSTER" = true ]; then
-        $SUDO tee -a "$_commons_script_file" > /dev/null << EOF
+  openrc)
+    if [ "$INIT_CLUSTER" = true ]; then
+      $SUDO tee -a "$_commons_script_file" >/dev/null <<EOF
   INFO "openrc: \$_op_message Database"
   rc-service postgresql \$_op
   { [ "\$_op" = start ] || [ "\$_op" = restart ]; } && wait_database_reachability
@@ -2600,17 +3394,17 @@ EOF
   rc-service recluster.server \$_op
   { [ "\$_op" = start ] || [ "\$_op" = restart ]; } && wait_server_reachability
 EOF
-      fi
-      $SUDO tee -a "$_commons_script_file" > /dev/null << EOF
+    fi
+    $SUDO tee -a "$_commons_script_file" >/dev/null <<EOF
   INFO "openrc: \$_op_message Node exporter"
   rc-service node_exporter \$_op
   INFO "openrc: \$_op_message K3s"
   rc-service k3s-recluster \$_op
 EOF
-      ;;
-    systemd)
-      if [ "$INIT_CLUSTER" = true ]; then
-        $SUDO tee -a "$_commons_script_file" > /dev/null << EOF
+    ;;
+  systemd)
+    if [ "$INIT_CLUSTER" = true ]; then
+      $SUDO tee -a "$_commons_script_file" >/dev/null <<EOF
   INFO "systemd: \$_op_message Database"
   systemctl \$_op postgresql.service
   { [ "\$_op" = start ] || [ "\$_op" = restart ]; } && wait_database_reachability
@@ -2618,18 +3412,18 @@ EOF
   systemctl \$_op recluster.server.service
   { [ "\$_op" = start ] || [ "\$_op" = restart ]; } && wait_server_reachability
 EOF
-      fi
-      $SUDO tee -a "$_commons_script_file" > /dev/null << EOF
+    fi
+    $SUDO tee -a "$_commons_script_file" >/dev/null <<EOF
   INFO "systemd: \$_op_message Node exporter"
   systemctl \$_op node_exporter.service
   INFO "systemd: \$_op_message K3s"
   systemctl \$_op k3s-recluster.service
 EOF
-      ;;
-    *) FATAL "Unknown init system '$INIT_SYSTEM'" ;;
+    ;;
+  *) FATAL "Unknown init system '$INIT_SYSTEM'" ;;
   esac
 
-  $SUDO tee -a "$_commons_script_file" > /dev/null << EOF
+  $SUDO tee -a "$_commons_script_file" >/dev/null <<EOF
 }
 EOF
   $SUDO chown root:root "$_commons_script_file"
@@ -2637,7 +3431,7 @@ EOF
 
   # Bootstrap script
   INFO "Constructing '$(basename "$_bootstrap_script_file")' script"
-  $SUDO tee "$_bootstrap_script_file" > /dev/null << EOF
+  $SUDO tee "$_bootstrap_script_file" >/dev/null <<EOF
 #!/usr/bin/env sh
 
 # Load commons
@@ -2650,17 +3444,17 @@ EOF
 {
 EOF
   if [ "$INIT_CLUSTER" = true ]; then
-    $SUDO tee -a "$_bootstrap_script_file" > /dev/null << EOF
+    $SUDO tee -a "$_bootstrap_script_file" >/dev/null <<EOF
   manage_services start
   update_node_status ACTIVE
 EOF
   else
-    $SUDO tee -a "$_bootstrap_script_file" > /dev/null << EOF
+    $SUDO tee -a "$_bootstrap_script_file" >/dev/null <<EOF
   update_node_status ACTIVE
   manage_services start
 EOF
   fi
-  $SUDO tee -a "$_bootstrap_script_file" > /dev/null << EOF
+  $SUDO tee -a "$_bootstrap_script_file" >/dev/null <<EOF
 }
 EOF
   $SUDO chown root:root "$_bootstrap_script_file"
@@ -2668,7 +3462,7 @@ EOF
 
   # Shutdown script
   INFO "Constructing '$(basename "$_shutdown_script_file")' script"
-  $SUDO tee "$_shutdown_script_file" > /dev/null << EOF
+  $SUDO tee "$_shutdown_script_file" >/dev/null <<EOF
 #!/usr/bin/env sh
 
 # Load commons
@@ -2692,11 +3486,11 @@ EOF
   # reCluster service
   INFO "Constructing reCluster service '$_service_name'"
   case $INIT_SYSTEM in
-    openrc)
-      _openrc_service_file="/etc/init.d/$_service_name"
+  openrc)
+    _openrc_service_file="/etc/init.d/$_service_name"
 
-      INFO "openrc: Constructing reCluster service file '$_openrc_service_file'"
-      $SUDO tee "$_openrc_service_file" > /dev/null << EOF
+    INFO "openrc: Constructing reCluster service file '$_openrc_service_file'"
+    $SUDO tee "$_openrc_service_file" >/dev/null <<EOF
 #!/sbin/openrc-run
 
 description="reCluster"
@@ -2717,17 +3511,17 @@ stop() {
   /usr/bin/env sh $_shutdown_script_file
 }
 EOF
-      $SUDO chown root:root "$_openrc_service_file"
-      $SUDO chmod 0755 "$_openrc_service_file"
+    $SUDO chown root:root "$_openrc_service_file"
+    $SUDO chmod 0755 "$_openrc_service_file"
 
-      INFO "openrc: Enabling reCluster service '$_service_name' at startup"
-      $SUDO rc-update add "$_service_name" default > /dev/null
-      ;;
-    systemd)
-      _systemd_service_file="/etc/systemd/system/$_service_name.service"
+    INFO "openrc: Enabling reCluster service '$_service_name' at startup"
+    $SUDO rc-update add "$_service_name" default >/dev/null
+    ;;
+  systemd)
+    _systemd_service_file="/etc/systemd/system/$_service_name.service"
 
-      INFO "systemd: Constructing reCluster service file '$_systemd_service_file'"
-      $SUDO tee "$_systemd_service_file" > /dev/null << EOF
+    INFO "systemd: Constructing reCluster service file '$_systemd_service_file'"
+    $SUDO tee "$_systemd_service_file" >/dev/null <<EOF
 [Unit]
 Description=reCluster
 After=network-online.target network.target
@@ -2741,14 +3535,14 @@ ExecStop=/usr/bin/env sh $_shutdown_script_file
 [Install]
 WantedBy=multi-user.target
 EOF
-      $SUDO chown root:root "$_systemd_service_file"
-      $SUDO chmod 0755 "$_systemd_service_file"
+    $SUDO chown root:root "$_systemd_service_file"
+    $SUDO chmod 0755 "$_systemd_service_file"
 
-      INFO "systemd: Enabling reCluster service '$_service_name' at startup"
-      $SUDO systemctl enable "$_service_name" > /dev/null
-      $SUDO systemctl daemon-reload > /dev/null
-      ;;
-    *) FATAL "Unknown init system '$INIT_SYSTEM'" ;;
+    INFO "systemd: Enabling reCluster service '$_service_name' at startup"
+    $SUDO systemctl enable "$_service_name" >/dev/null
+    $SUDO systemctl daemon-reload >/dev/null
+    ;;
+  *) FATAL "Unknown init system '$INIT_SYSTEM'" ;;
   esac
 
   spinner_stop
@@ -2762,15 +3556,15 @@ start_recluster() {
   spinner_start "Starting reCluster"
 
   case $INIT_SYSTEM in
-    openrc)
-      INFO "openrc: Starting reCluster"
-      $SUDO rc-service recluster restart
-      ;;
-    systemd)
-      INFO "systemd: Starting reCluster"
-      $SUDO systemctl restart recluster.service
-      ;;
-    *) FATAL "Unknown init system '$INIT_SYSTEM'" ;;
+  openrc)
+    INFO "openrc: Starting reCluster"
+    $SUDO rc-service recluster restart
+    ;;
+  systemd)
+    INFO "systemd: Starting reCluster"
+    $SUDO systemctl restart recluster.service
+    ;;
+  *) FATAL "Unknown init system '$INIT_SYSTEM'" ;;
   esac
 
   spinner_stop
@@ -2816,7 +3610,7 @@ configure_k8s() {
 
   # Hosts add
   DEBUG "Adding host entry '$_registry_etc_host' to '$_etc_hosts'"
-  printf '%s\n' "$_registry_etc_host" | $SUDO tee -a "$_etc_hosts" > /dev/null
+  printf '%s\n' "$_registry_etc_host" | $SUDO tee -a "$_etc_hosts" >/dev/null
 
   # K8s
   wait_k8s_reachability
