@@ -1532,6 +1532,8 @@ read_interfaces_info() {
 
   _interfaces_info=$(read_interfaces)
 
+  echo $_interfaces_info
+
   # Cycle interfaces to obtain additional information
   while read -r _interface; do
     # Name
@@ -1545,25 +1547,29 @@ read_interfaces_info() {
       # Se _speed è nel formato '1000M' o '1G', estrai il numero
       _speed=$(echo $_speed | sed -e 's/[MG]//')
     else
-      echo "Errore nella riga $LINENO: Il formato di speed '$_speed' non è valido."
+      DEBUG "The speed value '$_speed' for the interface '$_iname' is not valid."
       _speed=0
     fi
     # WoL
     _wol=$($SUDO ethtool "$_iname" | grep 'Supports Wake-on' | sed -e 's/Supports Wake-on://g' -e 's/[[:space:]]*//g')
-    if [ -z "$_wol" ]; then
-      _wol='d'
+
+    if [ -n "$_wol" ] || [ "$_speed" -e 0 ]; then
+      DEBUG "Updating interfaces"
+      # Update interfaces
+      _interfaces_info=$(
+        printf '%s\n' "$_interfaces_info" |
+          jq \
+            --arg iname "$_iname" \
+            --arg speed "$_speed" \
+            --arg wol "$_wol" \
+            'map(if .name == $iname then . + {"speed": $speed | tonumber, "wol": ($wol | split(""))} else . end)'
+      )
+
+    else
+      DEBUG "Removing not valid interface '$_iname'"
+      _interfaces_info=$(printf '%s\n' "$_interfaces_info" | jq --arg elem "$_iname" 'map(select(.name != $elem))')
+
     fi
-
-    # Update interfaces
-    _interfaces_info=$(
-      printf '%s\n' "$_interfaces_info" |
-        jq \
-          --arg iname "$_iname" \
-          --arg speed "$_speed" \
-          --arg wol "$_wol" \
-          'map(if .name == $iname then . + {"speed": $speed | tonumber, "wol": ($wol | split(""))} else . end)'
-    )
-
   done <<EOF
 $(printf '%s\n' "$_interfaces_info" | jq --compact-output '.[]')
 EOF
@@ -1602,6 +1608,7 @@ add_package() {
   fi
 }
 
+# Check if sysbench command is present and working
 if ! sysbench --help >/dev/null; then
 
   DEBUG "Sysbench not present or not working (not compatible pre compiled version installed)."
