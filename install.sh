@@ -782,7 +782,7 @@ cleanup() {
 
   ############################
 
-  # Cleanup sysbench compiling tmp directory
+  # Cleanup Sysbench compiling tmp directory
   cleanup_dir "$_sysbench_tmp_directory"
 
   ###########################
@@ -971,6 +971,192 @@ assert_timezone() {
 assert_user() {
   id "$USER" >/dev/null 2>&1 || FATAL "User '$USER' does not exists"
 }
+
+### Sysbench management methods
+
+# Check Sysbench status
+check_sysbench() {
+  INFO "Checking if the Sysbench command is working properly."
+
+  # Check if Sysbench command is present and working
+  if ! command sysbench --help >/dev/null 2>&1; then
+    sysbench_error=$?                      # Capture exit code
+    if [[ $sysbench_error -eq 126 ]]; then # Check for "Command not found"
+      FATAL "Sysbench command not found. Please install it."
+    elif [[ $sysbench_error -eq 127 ]]; then # Check for "Illegal instruction"
+      INFO "Sysbench encountered 'Illegal instruction' error. Looking for possible causes..."
+
+      # Perform CPU's specs checking
+      check_cpu_specs
+      compile_sysbench
+    else
+      INFO "Sysbench exited unexpectedly (exit code: $sysbench_error) because of currently unknown
+    reasons. Please check the exit code. You can anyway try to proceed compiling Sysbench from source."
+      compile_sysbench
+    fi
+  else
+    INFO "Sysbench is present and working properly."
+  fi
+}
+
+# Compile Sysbench
+compile_sysbench() {
+
+  # List of required packages for Sysbench compilation
+  _sysbench_packages="g++ autoconf make automake libtool pkgconfig libaio-dev"
+
+  read -p "Do you want to proceed compiling and autoconfiguring Sysbench from source? NOTE: without a working instance of
+  Sysbench, the recluster installation will be terminated. (Y/n) " yn
+
+  # Set default answer to "Y" if empty input
+  yn=${yn:-Y}
+
+  case $yn in
+  [Yy]*)
+    INFO "Continuing..."
+    # Remove already present pre compiled version of sysbench
+    DEBUG "Removing pre compiled version of Sysbench."
+    apk del sysbench
+
+    # Install all the required packages
+    DEBUG "Installing required packageS..."
+    for package in $_sysbench_packages; do
+      add_package "$package"
+    done
+
+    # Update apk database
+    apk update
+
+    # Clean apk cache
+    apk cache clean
+    DEBUG "Require packages installation process is completed."
+
+    # Sysbench arechive
+    _sysbench_archive_name="./dependencies/sysbench.tar.gz"
+
+    # Specifying tmp drectory
+    _sysbench_tmp_directory="./dependencies/sysbench_tmp"
+
+    # Main current installation directory
+    _main_install_directory=$(pwd)
+
+    # Create tmp directory
+    DEBUG "Creating temporary folder for Sysbench compilation..."
+    mkdir ./dependencies/sysbench_tmp
+
+    # Extracting the Sysbench archive
+    DEBUG "Extracting the Sysbench source archive..."
+    tar -xzf "$_sysbench_archive_name" -C "$_sysbench_tmp_directory" || {
+      FATAL "Error while extracting the Sysbench archive."
+    }
+
+    # Find the extracted subdirectory
+    _subdirectory_name=$(tar -tf "$_sysbench_archive_name" | head -n 1 | cut -d '/' -f 1)
+
+    # Going into the Sysbench tmp directory.
+    DEBUG "Entering the temporary folder..."
+    if ! cd "$_sysbench_tmp_directory/$_subdirectory_name"; then
+      FATAL "Could not get into Sysbench installation directory."
+    fi
+
+    # Autogen
+    DEBUG "Running the Sysbench autogen script..."
+    if ! ./autogen.sh >/dev/null; then
+      FATAL "Error in running Sysbench autogen script."
+    fi
+
+    # Configure
+    DEBUG "Runnning the Sysbench configuration script..."
+    if ! ./configure --without-mysql >/dev/null; then
+      FATAL "Error in running Sysbench configure script."
+    fi
+
+    # Make
+    DEBUG "Running Sysbench make script..."
+    if ! make -j >/dev/null; then
+      FATAL "Error in running Sysbench make script."
+    fi
+
+    # Install
+    DEBUG "Installing Sysbench..."
+    if ! make install >/dev/null; then
+      FATAL "Error in running Sysbench install script."
+    fi
+
+    cd "$_main_install_directory"
+
+    INFO "Sysbench compiling, configuration and installation completed successfully."
+    ;;
+  [Nn]*)
+    FATAL "Without a working instance of Sysbench the reCluster installation can't proceed. Aborting.. ."
+    ;;
+  *)
+    echo "Please answer yes (y) or no (n)."
+    ;;
+  esac
+}
+
+# Add dependency package
+add_package() {
+  package_name="$1"
+
+  # Verify if the package is already present
+  if apk info "$package_name" >/dev/null 2>&1; then
+    echo "The package $package_name is already installed."
+  else
+    # Install the package
+    apk add "$package_name"
+
+    # Verify the installation result
+    if [ $? -eq 0 ]; then
+      echo "The package $package_name has been succesflly installed."
+    else
+      FATAL "Error while installing the package $package_name. Exiting ..."
+
+    fi
+  fi
+}
+
+# Check CPU instruction sets support
+check_cpu_specs() {
+  local cpuinfo_file="/proc/cpuinfo"
+
+  # Check for AVX flag
+  avx_present=$(grep -iq "avx" "$cpuinfo_file" && echo true || echo false)
+  DEBUG "Sysbench installation debugging: AVX instruction set: ${avx_present}"
+
+  # Check for F16C flag
+  f16c_present=$(grep -iq "f16c" "$cpuinfo_file" && echo true || echo false)
+  DEBUG "Sysbench installation debugging: F16C instruction set: ${f16c_present}"
+
+  # Check the CPUID level
+  cpuid_level=$(grep -E '^cpuid level' "$cpuinfo_file" | cut -d ':' -f2 | tr -dc '[:digit:]')
+
+  if [$avx_present && !$f16c_present]; then
+    INFO "The AVX instruction set is supported by your CPU but the F16C instruction set is not. This is the
+    reason because the pre compiled version of Sysbench installed through the APK packet manager is not working.
+    Do yout want to proceed uninstalling the pre compiled version of Sysbench previously installed through the APK
+    packet manager and proceed with compilation from source?"
+  elif [!$avx_present && $f16c_present]; then
+    INFO "The AVX instruction set is not supported by your CPU but the F16C instruction set is. This is the
+    reason because the pre compiled version of Sysbench installed through the APK packet manager is not working."
+  elif [!$avx_present && !$f16c_present]; then
+    INFO "Neither the AVX instruction set nor the F16C instruction set are supported by your CPU. This is the
+    reason because the pre compiled version of Sysbench installed through the APK packet manager is not working."
+  elif [$avx_present && $f16c_present]; then
+    INFO "Both the AVX instruction set and the F16C instruction set are supported by your CPU. Going to check the
+    CPUID level of your CPU as further required condition."
+    if [[ $cpuid_level -le 11 ]]; then
+      INFO "Your CPU CPUID level is lower than or equal to 11. This is the
+    reason because the pre compiled version of Sysbench installed through the APK packet manager is not working."
+    else
+      INFO "WARNING: Your CPU CPUID level is higher than 11 and all the other known requirements are met. Something unusual is happened,
+      since the pre compiled Sysbench binary should be working. But it is not, probably other currently unknown conditions are not met."
+    fi
+  fi
+}
+
+###
 
 # Home directory of user
 user_home_dir() {
@@ -1578,127 +1764,6 @@ EOF
   RETVAL=$_interfaces_info
 }
 
-##########################################################################################################################
-
-###Compile Sysbench
-
-## Adding dependencies
-
-# List of required packages for sysbench compiling
-_sysbench_packages="g++ autoconf make automake libtool pkgconfig libaio-dev"
-
-# Package add method
-add_package() {
-  package_name="$1"
-
-  # Verify if the package is already present
-  if apk info "$package_name" >/dev/null 2>&1; then
-    echo "The package $package_name is already installed."
-  else
-    # Installthe package
-    apk add "$package_name"
-
-    # Verify the installation result
-    if [ $? -eq 0 ]; then
-      echo "The package $package_name has been succesflly installed."
-    else
-      echo "Error while installing the package $package_name. Exiting ..."
-      exit 1
-    fi
-  fi
-}
-
-# Check if sysbench command is present and working
-if ! sysbench --help >/dev/null; then
-
-  DEBUG "Sysbench not present or not working (not compatible pre compiled version installed)."
-
-  # Remove already present precompiled version of sysbench
-
-  apk del sysbench
-
-  # Install all the required packages
-  for package in $_sysbench_packages; do
-    add_package "$package"
-  done
-
-  # Update apk database
-  apk update
-
-  # Clean apk cache
-  apk cache clean
-
-  echo "Require packages installation process is completed."
-
-  # Sysbench arechive
-  _sysbench_archive_name="./dependencies/sysbench.tar.gz"
-
-  # Specifying tmp drectory
-  _sysbench_tmp_directory="./dependencies/sysbench_tmp"
-
-  # Main current installation directory
-
-  _main_install_directory=$(pwd)
-
-  # Create tmp directory
-
-  mkdir ./dependencies/sysbench_tmp
-
-  # Extracting the sysbench archive
-
-  tar -xzf "$_sysbench_archive_name" -C "$_sysbench_tmp_directory" || {
-    echo "Error while extracting the sysbench archive."
-    exit 1
-  }
-
-  # Find the extracted subdirectory
-
-  _subdirectory_name=$(tar -tf "$_sysbench_archive_name" | head -n 1 | cut -d '/' -f 1)
-
-  # Going into the sysbench tmp directory.
-
-  if ! cd "$_sysbench_tmp_directory/$_subdirectory_name"; then
-    FATAL "Could not get into sysbench installation directory."
-    exit 1
-  fi
-
-  # Autogen
-
-  if ! ./autogen.sh >/dev/null; then
-    FATAL "Error in running sysbench autogen script."
-    exit 1
-  fi
-
-  # Configure
-
-  if ! ./configure --without-mysql >/dev/null; then
-    FATAL "Error in running sysbench configure script."
-    exit 1
-  fi
-
-  # Make
-
-  if ! make -j >/dev/null; then
-    FATAL "Error in running sysbench make script."
-    exit 1
-  fi
-
-  # Install
-
-  if ! make install >/dev/null; then
-    FATAL "Error in running sysbench install script."
-    exit 1
-  fi
-
-  cd "$_main_install_directory"
-
-  INFO "Sysbench compiling and installation completed"
-else
-  INFO "Sysbench is present and working."
-fi
-
-#################################################################################################################################
-
 # Execute CPU benchmark
 run_cpu_bench() {
   _run_cpu_bench() {
@@ -2304,6 +2369,7 @@ verify_system() {
   assert_cmd ssh-keygen
   assert_cmd sudo
   assert_cmd sysbench
+  check_sysbench
   assert_cmd tar
   assert_cmd tee
   assert_cmd tr
@@ -2321,7 +2387,6 @@ verify_system() {
   fi
   # Spinner
   assert_spinner
-
   # User
   assert_user
   # Init system
