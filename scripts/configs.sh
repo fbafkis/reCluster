@@ -71,7 +71,7 @@ trap cleanup INT QUIT TERM EXIT
 # ================
 # Show help message
 show_help() {
-  cat << EOF
+  cat <<EOF
 Usage: $(basename "$0") [--config-file <FILE>] [--help] [--in-dir <DIR>] [--out-dir <DIR>] [--overwrite]
 
 $HELP_COMMONS_USAGE
@@ -135,7 +135,7 @@ configs_prepare() {
 
       INFO "Executing '$_run' of '$_config'"
       _run_result=$(eval "$_run") || FATAL "Error executing '$_run' of '$_config'"
-    done << EOF
+    done <<EOF
 $(printf '%s\n' "$_runs" | jq --compact-output '.[]')
 EOF
     DEBUG "'run' of '$_config' result:\n$_run_result"
@@ -143,14 +143,14 @@ EOF
     # Update configuration
     CONFIG=$(printf '%s\n' "$CONFIG" | jq --arg key "$_config" --arg value "$_run_result" '. += [{ key: $key, value: $value }]')
   done \
-    << EOF
+    <<EOF
 $(printf '%s\n' "$(config__)" | jq --compact-output '.[]')
 EOF
 }
 
 # Move configurations
 configs_move() {
-  _in_dir="$IN_DIR.old"
+  _in_dir="${IN_DIR%*}.old"
   [ ! -d "$_in_dir" ] || FATAL "Directory '$_in_dir' already exists"
 
   DEBUG "Renaming '$IN_DIR' to '$_in_dir'"
@@ -180,41 +180,41 @@ parse_args() {
     _shifts=1
 
     case $1 in
-      --config-file)
-        # Configuration file
-        parse_args_assert_value "$@"
+    --config-file)
+      # Configuration file
+      parse_args_assert_value "$@"
 
-        CONFIG_FILE=$2
-        _shifts=2
-        ;;
-      --help)
-        # Display help message and exit
-        show_help
-        exit 0
-        ;;
-      --in-dir)
-        # Input directory
-        parse_args_assert_value "$@"
+      CONFIG_FILE=$2
+      _shifts=2
+      ;;
+    --help)
+      # Display help message and exit
+      show_help
+      exit 0
+      ;;
+    --in-dir)
+      # Input directory
+      parse_args_assert_value "$@"
 
-        IN_DIR=$2
-        _shifts=2
-        ;;
-      --out-dir)
-        # Output directory
-        parse_args_assert_value "$@"
+      IN_DIR=$2
+      _shifts=2
+      ;;
+    --out-dir)
+      # Output directory
+      parse_args_assert_value "$@"
 
-        OUT_DIR=$2
-        _shifts=2
-        ;;
-      --overwrite)
-        # Overwrite
-        OVERWRITE=true
-        ;;
-      *)
-        # Commons
-        parse_args_commons "$@"
-        _shifts=$RETVAL
-        ;;
+      OUT_DIR=$2
+      _shifts=2
+      ;;
+    --overwrite)
+      # Overwrite
+      OVERWRITE=true
+      ;;
+    *)
+      # Commons
+      parse_args_commons "$@"
+      _shifts=$RETVAL
+      ;;
     esac
 
     # Shift arguments
@@ -304,10 +304,10 @@ configs() {
       # Replace line file
       DEBUG "Replacing '$_line_original' with '$_line'"
       sed -i "s^$_line_original^$_line^" "$_file"
-    done << EOF
+    done <<EOF
 $(grep -E "$_regex" "$_file")
 EOF
-  done << EOF
+  done <<EOF
 $(find "$TMP_DIR" -type f)
 EOF
 

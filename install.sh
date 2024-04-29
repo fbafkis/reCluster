@@ -768,6 +768,8 @@ NODE_EXPORTER_CONFIG=
 NODE_FACTS='{}'
 # Temporary directory
 TMP_DIR=
+#Sysbench binary path
+SYSBENCH_PATH=
 
 # ================
 # CLEANUP
@@ -777,6 +779,7 @@ cleanup() {
   _exit_code=$?
   [ $_exit_code = 0 ] || WARN "Cleanup exit code $_exit_code"
 
+  cd $_main_install_directory
   # Cleanup temporary directory
   cleanup_dir "$TMP_DIR"
 
@@ -979,11 +982,12 @@ check_sysbench() {
   INFO "Checking if the Sysbench command is working properly."
 
   # Check if Sysbench command is present and working
-  if ! command sysbench --help >/dev/null 2>&1; then
-    sysbench_error=$?                      # Capture exit code
+  if command sysbench --help >/dev/null 2>&1; then
+    sysbench_error=$? # Capture exit code
+    DEBUG "Sysbench exit code: $sysbench_error."
     if [[ $sysbench_error -eq 126 ]]; then # Check for "Command not found"
       FATAL "Sysbench command not found. Please install it."
-    elif [[ $sysbench_error -eq 127 ]]; then # Check for "Illegal instruction"
+    elif [[ $sysbench_error -eq 132 ]]; then # Check for "Illegal instruction"
       INFO "Sysbench encountered 'Illegal instruction' error. Looking for possible causes..."
 
       # Perform CPU's specs checking
@@ -1042,6 +1046,7 @@ compile_sysbench() {
 
     # Create tmp directory
     DEBUG "Creating temporary folder for Sysbench compilation..."
+    rm -rf ./dependencies/sysbench_tmp
     mkdir ./dependencies/sysbench_tmp
 
     # Extracting the Sysbench archive
@@ -1077,18 +1082,41 @@ compile_sysbench() {
       FATAL "Error in running Sysbench make script."
     fi
 
-    # Install
-    DEBUG "Installing Sysbench..."
-    if ! make install >/dev/null; then
-      FATAL "Error in running Sysbench install script."
-    fi
+    # Renaming the binary
 
+    DEBUG "Renaming the Sysbench binary to \"recluster_sysbench\"."
+    mv ./src/sysbench ./src/recluster_sysbench
+
+    #TODO: Check if Sysbench now actually works.
+
+    # Asking the user if he wants to install the working Sysbench into the system.
+
+    read -p "Now a working instance of Sysbench is available. Do you want to proceed installing
+    this on the system so that it will be available after the end of the installation? Otherwise
+    it will be removed when the installation ends. (y/N) " yn
+
+    # Set default answer to "Y" if empty input
+    yn=${yn:-N}
+    case $yn in
+    [Yy]*)
+      INFO "Installing the sysbench binary to the ~/bin/ location."
+      cp ./src/recluster_sysbench ~/bin/
+      SYSBENCH_PATH="~/bin/"
+      ;;
+    [Nn]*)
+      INFO "The Sysbench binary will remain to the temporary location and will be removed after installation's ending."
+      SYSBENCH_PATH="$_sysbench_tmp_directory/$_subdirectory_name/src"
+      ;;
+    *)
+      echo "Please answer yes (y) or no (n)."
+      ;;
+    esac
     cd "$_main_install_directory"
-
     INFO "Sysbench compiling, configuration and installation completed successfully."
     ;;
   [Nn]*)
-    FATAL "Without a working instance of Sysbench the reCluster installation can't proceed. Aborting.. ."
+    FATAL "Without a working instance of Sysbench the reCluster installation can't proceed. Aborting..."
+    cd "$_main_install_directory"
     ;;
   *)
     echo "Please answer yes (y) or no (n)."
@@ -1767,7 +1795,7 @@ EOF
 # Execute CPU benchmark
 run_cpu_bench() {
   _run_cpu_bench() {
-    sysbench --time="$BENCH_TIME" --threads="$1" cpu run |
+    $SYSBENCH_PATH/recluster_sysbench --time="$BENCH_TIME" --threads="$1" cpu run |
       grep 'events per second' |
       sed -e 's/events per second://g' -e 's/[[:space:]]*//g' |
       xargs printf "%.0f"
@@ -1802,7 +1830,7 @@ run_cpu_bench() {
 # Execute memory benchmark
 run_memory_bench() {
   _run_memory_bench() {
-    _memory_output=$(sysbench --time="$BENCH_TIME" --memory-oper="$1" --memory-access-mode="$2" memory run |
+    _memory_output=$($SYSBENCH_PATH/recluster_sysbench --time="$BENCH_TIME" --memory-oper="$1" --memory-access-mode="$2" memory run |
       grep 'transferred' |
       sed -e 's/.*(\(.*\))/\1/' -e 's/B.*//' -e 's/[[:space:]]*//g' |
       numfmt --from=iec-i)
@@ -1861,12 +1889,12 @@ run_storages_bench() {
     write)
       _io_opt=written
       # Prepare write benchmark
-      sysbench fileio cleanup >/dev/null
-      sysbench fileio prepare >/dev/null
+      $SYSBENCH_PATH/recluster_sysbench fileio cleanup >/dev/null
+      $SYSBENCH_PATH/recluster_sysbench fileio prepare >/dev/null
       ;;
     esac
 
-    _io_output=$(sysbench --time="$BENCH_TIME" --file-test-mode="$2" --file-io-mode="$3" fileio run | grep "$_io_opt, ")
+    _io_output=$($SYSBENCH_PATH/recluster_sysbench --time="$BENCH_TIME" --file-test-mode="$2" --file-io-mode="$3" fileio run | grep "$_io_opt, ")
     _io_throughput_value=$(printf '%s\n' "$_io_output" | sed -e 's/^.*: //' -e 's/[[:space:]]*//g')
     _io_throughput_unit=$(printf '%s\n' "$_io_output" | sed -e 's/.*,\(.*\)B\/s.*/\1/' -e 's/[[:space:]]*//g')
 
@@ -1878,8 +1906,8 @@ run_storages_bench() {
 
   # Prepare read benchmark
   DEBUG "Preparing storage(s) read benchmark"
-  sysbench fileio cleanup >/dev/null
-  sysbench fileio prepare >/dev/null
+  $SYSBENCH_PATH/recluster_sysbench fileio cleanup >/dev/null
+  $SYSBENCH_PATH/recluster_sysbench fileio prepare >/dev/null
 
   # Read sequential synchronous
   DEBUG "Running storage(s) benchmark in read sequential synchronous"
@@ -1923,7 +1951,7 @@ run_storages_bench() {
 
   # Clean
   DEBUG "Cleaning storage(s) benchmark"
-  sysbench fileio cleanup >/dev/null
+  $SYSBENCH_PATH/recluster_sysbench fileio cleanup >/dev/null
 
   # Return
   RETVAL=$(
@@ -1967,7 +1995,7 @@ run_storages_bench() {
 # Read CPU power consumption
 read_cpu_power_consumption() {
   _run_cpu_bench() {
-    sysbench --time=0 --threads="$1" cpu run >/dev/null &
+    $SYSBENCH_PATH/recluster_sysbench --time=0 --threads="$1" cpu run >/dev/null &
     read_power_consumption "$!"
   }
   _threads=$(grep -c ^processor /proc/cpuinfo)
@@ -2517,15 +2545,30 @@ EOF
 
     case $_supports_wol in
     *g*)
-      # WoL supported
+      # Supported WOL
       _wol=$($SUDO ethtool "$_iname" | grep 'Wake-on' | grep -v 'Supports Wake-on' | sed -e 's/Wake-on://g' -e 's/[[:space:]]*//g')
-      [ "$_wol" != d ] || FATAL "Interface '$_iname' Wake-on-Lan is disabled"
+      if [ "$_wol" != d ]; then
+        INFO "Wake-On-LAN for interface '$_iname' is disabled."
+        # Aske the user if he wants to enable the WOL
+        read -p "Do you want to enable Wake-On-LAN '$_iname'? [Y/n] " answer
+        # Default case yes
+        if [ -z "$answer" ] || [ "$answer" = "Y" ] || [ "$answer" = "y" ]; then
+          # Enabling Wake-On-LAN
+          $SUDO ethtool -s "$_iname" wol b
+          INFO "Wake-on-LAN enabled for interface '$_iname'."
+        else
+          FATAL "Wake-on-LAN not enabled for interface '$_iname'."
+        fi
+      else
+        INFO "Wake-On-LAN already enabled for interface '$_iname'."
+      fi
       ;;
     *)
-      # WoL not supported
-      WARN "Interface '$_iname' does not support Wake-on-Lan"
+      # Wake-on-LAN non supportato
+      INFO "Interface '$_iname' doesn't support Wake-on-LAN"
       ;;
     esac
+
   done <<EOF
 $(printf '%s\n' "$_interfaces" | jq --compact-output '.[]')
 EOF
