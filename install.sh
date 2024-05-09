@@ -978,150 +978,270 @@ assert_user() {
 ### Sysbench management methods
 
 # Check Sysbench status
+# check_sysbench() {
+#   INFO "Checking if the Sysbench command is working properly."
+
+#   # Check if Sysbench command is present and working
+#   if command sysbench --help >/dev/null 2>&1; then
+#     sysbench_error=$? # Capture exit code
+#     DEBUG "Sysbench exit code: $sysbench_error."
+#     if [[ $sysbench_error -eq 126 ]]; then # Check for "Command not found"
+#       FATAL "Sysbench command not found. Please install it."
+#     elif [[ $sysbench_error -eq 132 ]]; then # Check for "Illegal instruction"
+#       INFO "Sysbench encountered 'Illegal instruction' error. Looking for possible causes..."
+
+#       # Perform CPU's specs checking
+#       check_cpu_specs
+#       compile_sysbench
+#     else
+#       INFO "Sysbench exited unexpectedly (exit code: $sysbench_error) because of currently unknown
+#     reasons. Please check the exit code. You can anyway try to proceed compiling Sysbench from source."
+#       compile_sysbench
+#     fi
+#   else
+#     INFO "Sysbench is present and working properly."
+#   fi
+# }
+
+#!/bin/bash
+
 check_sysbench() {
-  INFO "Checking if the Sysbench command is working properly."
+  whiptail --title "Check Sysbench" --msgbox "Checking if the Sysbench command is working properly." 8 78
 
   # Check if Sysbench command is present and working
   if command sysbench --help >/dev/null 2>&1; then
-    sysbench_error=$? # Capture exit code
-    DEBUG "Sysbench exit code: $sysbench_error."
+    sysbench_error=$?                      # Capture exit code
     if [[ $sysbench_error -eq 126 ]]; then # Check for "Command not found"
-      FATAL "Sysbench command not found. Please install it."
+      whiptail --title "Error" --msgbox "Sysbench command not found. Please install it." 8 78
+      return 1
     elif [[ $sysbench_error -eq 132 ]]; then # Check for "Illegal instruction"
-      INFO "Sysbench encountered 'Illegal instruction' error. Looking for possible causes..."
+      whiptail --title "Error" --msgbox "Sysbench encountered an 'Illegal instruction' error. Looking for possible causes..." 10 78
 
       # Perform CPU's specs checking
       check_cpu_specs
       compile_sysbench
     else
-      INFO "Sysbench exited unexpectedly (exit code: $sysbench_error) because of currently unknown
-    reasons. Please check the exit code. You can anyway try to proceed compiling Sysbench from source."
+      whiptail --title "Error" --msgbox "Sysbench exited unexpectedly (exit code: $sysbench_error) because of currently unknown reasons. Please check the exit code. You can anyway try to proceed compiling Sysbench from source." 10 78
       compile_sysbench
     fi
   else
-    INFO "Sysbench is present and working properly."
+    whiptail --title "Info" --msgbox "Sysbench is present and working properly." 8 78
   fi
 }
 
 # Compile Sysbench
+# compile_sysbench() {
+
+#   # List of required packages for Sysbench compilation
+#   _sysbench_packages="g++ autoconf make automake libtool pkgconfig libaio-dev"
+
+#   read -p "Do you want to proceed compiling and autoconfiguring Sysbench from source? NOTE: without a working instance of
+#   Sysbench, the recluster installation will be terminated. (Y/n) " yn
+
+#   # Set default answer to "Y" if empty input
+#   yn=${yn:-Y}
+
+#   case $yn in
+#   [Yy]*)
+#     INFO "Continuing..."
+#     # Remove already present pre compiled version of sysbench
+#     DEBUG "Removing pre compiled version of Sysbench."
+#     apk del sysbench
+
+#     # Check the internet connection
+
+#     if curl --output /dev/null --silent --head --fail http://www.google.com; then
+#       # Update apk database
+#       apk update
+#     else
+#       WARN "No internet connection, if some packages are missing, it will be impossible to install them automatically."
+#     fi
+
+#     # Install all the required packages
+#     DEBUG "Installing required packageS..."
+#     for package in $_sysbench_packages; do
+#       add_package "$package"
+#     done
+
+#     # Clean apk cache
+#     apk cache clean
+#     DEBUG "Require packages installation process is completed."
+
+#     # Sysbench arechive
+#     _sysbench_archive_name="./dependencies/sysbench.tar.gz"
+
+#     # Specifying tmp drectory
+#     _sysbench_tmp_directory="./dependencies/sysbench_tmp"
+
+#     # Main current installation directory
+#     _main_install_directory=$(pwd)
+
+#     # Create tmp directory
+#     DEBUG "Creating temporary folder for Sysbench compilation..."
+#     rm -rf ./dependencies/sysbench_tmp
+#     mkdir ./dependencies/sysbench_tmp
+
+#     # Extracting the Sysbench archive
+#     DEBUG "Extracting the Sysbench source archive..."
+#     tar -xzf "$_sysbench_archive_name" -C "$_sysbench_tmp_directory" || {
+#       FATAL "Error while extracting the Sysbench archive."
+#     }
+
+#     # Find the extracted subdirectory
+#     _subdirectory_name=$(tar -tf "$_sysbench_archive_name" | head -n 1 | cut -d '/' -f 1)
+
+#     # Going into the Sysbench tmp directory.
+#     DEBUG "Entering the temporary folder..."
+#     if ! cd "$_sysbench_tmp_directory/$_subdirectory_name"; then
+#       FATAL "Could not get into Sysbench installation directory."
+#     fi
+
+#     # Autogen
+#     DEBUG "Running the Sysbench autogen script..."
+#     if ! ./autogen.sh >/dev/null; then
+#       FATAL "Error in running Sysbench autogen script."
+#     fi
+
+#     # Configure
+#     DEBUG "Runnning the Sysbench configuration script..."
+#     if ! ./configure --without-mysql >/dev/null; then
+#       FATAL "Error in running Sysbench configure script."
+#     fi
+
+#     # Make
+#     DEBUG "Running Sysbench make script..."
+#     if ! make -j >/dev/null; then
+#       FATAL "Error in running Sysbench make script."
+#     fi
+
+#     # Renaming the binary
+
+#     DEBUG "Renaming the Sysbench binary to \"recluster_sysbench\"."
+#     mv ./src/sysbench ./src/recluster_sysbench
+
+#     #TODO: Check if Sysbench now actually works.
+
+#     # Asking the user if he wants to install the working Sysbench into the system.
+
+#     read -p "Now a working instance of Sysbench is available. Do you want to proceed installing
+#     this on the system so that it will be available after the end of the installation? Otherwise
+#     it will be removed when the installation ends. (y/N) " yn
+
+#     # Set default answer to "Y" if empty input
+#     yn=${yn:-N}
+#     case $yn in
+#     [Yy]*)
+#       INFO "Installing the sysbench binary to the ~/bin/ location."
+#       cp ./src/recluster_sysbench ~/bin/
+#       SYSBENCH_PATH="~/bin/"
+#       ;;
+#     [Nn]*)
+#       INFO "The Sysbench binary will remain to the temporary location and will be removed after installation's ending."
+#       SYSBENCH_PATH="$_sysbench_tmp_directory/$_subdirectory_name/src"
+#       ;;
+#     *)
+#       echo "Please answer yes (y) or no (n)."
+#       ;;
+#     esac
+#     cd "$_main_install_directory"
+#     INFO "Sysbench compiling, configuration and installation completed successfully."
+#     ;;
+#   [Nn]*)
+#     FATAL "Without a working instance of Sysbench the reCluster installation can't proceed. Aborting..."
+#     cd "$_main_install_directory"
+#     ;;
+#   *)
+#     echo "Please answer yes (y) or no (n)."
+#     ;;
+#   esac
+# }
+
+#!/bin/bash
+
 compile_sysbench() {
 
   # List of required packages for Sysbench compilation
   _sysbench_packages="g++ autoconf make automake libtool pkgconfig libaio-dev"
 
-  read -p "Do you want to proceed compiling and autoconfiguring Sysbench from source? NOTE: without a working instance of
-  Sysbench, the recluster installation will be terminated. (Y/n) " yn
-
-  # Set default answer to "Y" if empty input
-  yn=${yn:-Y}
-
-  case $yn in
-  [Yy]*)
-    INFO "Continuing..."
+  # Asking user to proceed with compilation
+  if whiptail --title "Compile Sysbench" --yesno "Do you want to proceed compiling and autoconfiguring Sysbench from source? NOTE: without a working instance of Sysbench, the recluster installation will be terminated. (Y/n)" 12 78; then
+    whiptail --title "Compilation Process" --infobox "Continuing..." 8 78
     # Remove already present pre compiled version of sysbench
-    DEBUG "Removing pre compiled version of Sysbench."
     apk del sysbench
 
+    # Check the internet connection
+    if curl --output /dev/null --silent --head --fail http://www.google.com; then
+      # Update apk database
+      apk update
+    else
+      whiptail --title "Network Error" --msgbox "No internet connection, if some packages are missing, it will be impossible to install them automatically." 10 78
+    fi
+
     # Install all the required packages
-    DEBUG "Installing required packageS..."
     for package in $_sysbench_packages; do
       add_package "$package"
     done
 
-    # Update apk database
-    apk update
-
     # Clean apk cache
     apk cache clean
-    DEBUG "Require packages installation process is completed."
 
-    # Sysbench arechive
+    # Sysbench archive
     _sysbench_archive_name="./dependencies/sysbench.tar.gz"
 
-    # Specifying tmp drectory
+    # Specifying tmp directory
     _sysbench_tmp_directory="./dependencies/sysbench_tmp"
 
     # Main current installation directory
     _main_install_directory=$(pwd)
 
     # Create tmp directory
-    DEBUG "Creating temporary folder for Sysbench compilation..."
     rm -rf ./dependencies/sysbench_tmp
     mkdir ./dependencies/sysbench_tmp
 
     # Extracting the Sysbench archive
-    DEBUG "Extracting the Sysbench source archive..."
     tar -xzf "$_sysbench_archive_name" -C "$_sysbench_tmp_directory" || {
-      FATAL "Error while extracting the Sysbench archive."
+      whiptail --title "Error" --msgbox "Error while extracting the Sysbench archive." 10 78
+      return 1
     }
 
     # Find the extracted subdirectory
     _subdirectory_name=$(tar -tf "$_sysbench_archive_name" | head -n 1 | cut -d '/' -f 1)
 
     # Going into the Sysbench tmp directory.
-    DEBUG "Entering the temporary folder..."
     if ! cd "$_sysbench_tmp_directory/$_subdirectory_name"; then
-      FATAL "Could not get into Sysbench installation directory."
+      whiptail --title "Error" --msgbox "Could not get into Sysbench installation directory." 10 78
+      return 1
     fi
 
-    # Autogen
-    DEBUG "Running the Sysbench autogen script..."
-    if ! ./autogen.sh >/dev/null; then
-      FATAL "Error in running Sysbench autogen script."
-    fi
+    # Running the Sysbench autogen script
+    ./autogen.sh >/dev/null
 
     # Configure
-    DEBUG "Runnning the Sysbench configuration script..."
-    if ! ./configure --without-mysql >/dev/null; then
-      FATAL "Error in running Sysbench configure script."
-    fi
+    ./configure --without-mysql >/dev/null
 
     # Make
-    DEBUG "Running Sysbench make script..."
-    if ! make -j >/dev/null; then
-      FATAL "Error in running Sysbench make script."
-    fi
+    make -j >/dev/null
 
     # Renaming the binary
-
-    DEBUG "Renaming the Sysbench binary to \"recluster_sysbench\"."
     mv ./src/sysbench ./src/recluster_sysbench
 
-    #TODO: Check if Sysbench now actually works.
-
-    # Asking the user if he wants to install the working Sysbench into the system.
-
-    read -p "Now a working instance of Sysbench is available. Do you want to proceed installing
-    this on the system so that it will be available after the end of the installation? Otherwise
-    it will be removed when the installation ends. (y/N) " yn
-
-    # Set default answer to "Y" if empty input
-    yn=${yn:-N}
-    case $yn in
-    [Yy]*)
-      INFO "Installing the sysbench binary to the ~/bin/ location."
+    # Asking user if they want to install the working Sysbench into the system
+    if whiptail --title "Sysbench Installation" --yesno "Now a working instance of Sysbench is available. Do you want to proceed installing this on the system so that it will be available after the end of the installation? Otherwise it will be removed when the installation ends. (y/N)" 12 78; then
+      whiptail --title "Installation" --infobox "Installing the sysbench binary to the ~/bin/ location." 8 78
       cp ./src/recluster_sysbench ~/bin/
       SYSBENCH_PATH="~/bin/"
-      ;;
-    [Nn]*)
-      INFO "The Sysbench binary will remain to the temporary location and will be removed after installation's ending."
+    else
+      whiptail --title "Temporary Installation" --infobox "The Sysbench binary will remain to the temporary location and will be removed after installation's ending." 8 78
       SYSBENCH_PATH="$_sysbench_tmp_directory/$_subdirectory_name/src"
-      ;;
-    *)
-      echo "Please answer yes (y) or no (n)."
-      ;;
-    esac
+    fi
+
     cd "$_main_install_directory"
-    INFO "Sysbench compiling, configuration and installation completed successfully."
-    ;;
-  [Nn]*)
-    FATAL "Without a working instance of Sysbench the reCluster installation can't proceed. Aborting..."
+    whiptail --title "Success" --msgbox "Sysbench compiling, configuration and installation completed successfully." 10 78
+  else
+    whiptail --title "Aborted" --msgbox "Without a working instance of Sysbench the reCluster installation can't proceed. Aborting..." 10 78
     cd "$_main_install_directory"
-    ;;
-  *)
-    echo "Please answer yes (y) or no (n)."
-    ;;
-  esac
+    return 1
+  fi
 }
 
 # Add dependency package
@@ -1130,14 +1250,14 @@ add_package() {
 
   # Verify if the package is already present
   if apk info "$package_name" >/dev/null 2>&1; then
-    echo "The package $package_name is already installed."
+    DEBUG "The package $package_name is already installed."
   else
     # Install the package
     apk add "$package_name"
 
     # Verify the installation result
     if [ $? -eq 0 ]; then
-      echo "The package $package_name has been succesflly installed."
+      DEBUG "The package $package_name has been succesflly installed."
     else
       FATAL "Error while installing the package $package_name. Exiting ..."
 
@@ -1146,6 +1266,46 @@ add_package() {
 }
 
 # Check CPU instruction sets support
+# check_cpu_specs() {
+#   local cpuinfo_file="/proc/cpuinfo"
+
+#   # Check for AVX flag
+#   avx_present=$(grep -iq "avx" "$cpuinfo_file" && echo true || echo false)
+#   DEBUG "Sysbench installation debugging: AVX instruction set: ${avx_present}"
+
+#   # Check for F16C flag
+#   f16c_present=$(grep -iq "f16c" "$cpuinfo_file" && echo true || echo false)
+#   DEBUG "Sysbench installation debugging: F16C instruction set: ${f16c_present}"
+
+#   # Check the CPUID level
+#   cpuid_level=$(grep -E '^cpuid level' "$cpuinfo_file" | cut -d ':' -f2 | tr -dc '[:digit:]')
+
+#   if [$avx_present && !$f16c_present]; then
+#     INFO "The AVX instruction set is supported by your CPU but the F16C instruction set is not. This is the
+#     reason because the pre compiled version of Sysbench installed through the APK packet manager is not working.
+#     Do yout want to proceed uninstalling the pre compiled version of Sysbench previously installed through the APK
+#     packet manager and proceed with compilation from source?"
+#   elif [!$avx_present && $f16c_present]; then
+#     INFO "The AVX instruction set is not supported by your CPU but the F16C instruction set is. This is the
+#     reason because the pre compiled version of Sysbench installed through the APK packet manager is not working."
+#   elif [!$avx_present && !$f16c_present]; then
+#     INFO "Neither the AVX instruction set nor the F16C instruction set are supported by your CPU. This is the
+#     reason because the pre compiled version of Sysbench installed through the APK packet manager is not working."
+#   elif [$avx_present && $f16c_present]; then
+#     INFO "Both the AVX instruction set and the F16C instruction set are supported by your CPU. Going to check the
+#     CPUID level of your CPU as further required condition."
+#     if [[ $cpuid_level -le 11 ]]; then
+#       INFO "Your CPU CPUID level is lower than or equal to 11. This is the
+#     reason because the pre compiled version of Sysbench installed through the APK packet manager is not working."
+#     else
+#       INFO "WARNING: Your CPU CPUID level is higher than 11 and all the other known requirements are met. Something unusual is happened,
+#       since the pre compiled Sysbench binary should be working. But it is not, probably other currently unknown conditions are not met."
+#     fi
+#   fi
+# }
+
+#!/bin/bash
+
 check_cpu_specs() {
   local cpuinfo_file="/proc/cpuinfo"
 
@@ -1160,26 +1320,18 @@ check_cpu_specs() {
   # Check the CPUID level
   cpuid_level=$(grep -E '^cpuid level' "$cpuinfo_file" | cut -d ':' -f2 | tr -dc '[:digit:]')
 
-  if [$avx_present && !$f16c_present]; then
-    INFO "The AVX instruction set is supported by your CPU but the F16C instruction set is not. This is the
-    reason because the pre compiled version of Sysbench installed through the APK packet manager is not working.
-    Do yout want to proceed uninstalling the pre compiled version of Sysbench previously installed through the APK
-    packet manager and proceed with compilation from source?"
-  elif [!$avx_present && $f16c_present]; then
-    INFO "The AVX instruction set is not supported by your CPU but the F16C instruction set is. This is the
-    reason because the pre compiled version of Sysbench installed through the APK packet manager is not working."
-  elif [!$avx_present && !$f16c_present]; then
-    INFO "Neither the AVX instruction set nor the F16C instruction set are supported by your CPU. This is the
-    reason because the pre compiled version of Sysbench installed through the APK packet manager is not working."
-  elif [$avx_present && $f16c_present]; then
-    INFO "Both the AVX instruction set and the F16C instruction set are supported by your CPU. Going to check the
-    CPUID level of your CPU as further required condition."
+  if [ "$avx_present" = true ] && [ "$f16c_present" = false ]; then
+    whiptail --title "CPU Support" --msgbox "The AVX instruction set is supported by your CPU but the F16C instruction set is not. This is the reason because the pre compiled version of Sysbench installed through the APK packet manager is not working." 12 78
+  elif [ "$avx_present" = false ] && [ "$f16c_present" = true ]; then
+    whiptail --title "CPU Support" --msgbox "The AVX instruction set is not supported by your CPU but the F16C instruction set is. This is the reason because the pre compiled version of Sysbench installed through the APK packet manager is not working." 12 78
+  elif [ "$avx_present" = false ] && [ "$f16c_present" = false ]; then
+    whiptail --title "CPU Support" --msgbox "Neither the AVX instruction set nor the F16C instruction set are supported by your CPU. This is the reason because the pre compiled version of Sysbench installed through the APK packet manager is not working." 12 78
+  elif [ "$avx_present" = true ] && [ "$f16c_present" = true ]; then
+    whiptail --title "CPU Support" --msgbox "Both the AVX instruction set and the F16C instruction set are supported by your CPU. Going to check the CPUID level of your CPU as further required condition." 12 78
     if [[ $cpuid_level -le 11 ]]; then
-      INFO "Your CPU CPUID level is lower than or equal to 11. This is the
-    reason because the pre compiled version of Sysbench installed through the APK packet manager is not working."
+      whiptail --title "CPUID Level Check" --msgbox "Your CPU CPUID level is lower than or equal to 11. This is the reason because the pre compiled version of Sysbench installed through the APK packet manager is not working." 12 78
     else
-      INFO "WARNING: Your CPU CPUID level is higher than 11 and all the other known requirements are met. Something unusual is happened,
-      since the pre compiled Sysbench binary should be working. But it is not, probably other currently unknown conditions are not met."
+      whiptail --title "CPUID Level Warning" --msgbox "WARNING: Your CPU CPUID level is higher than 11 and all the other known requirements are met. Something unusual is happened, since the pre compiled Sysbench binary should be working. But it is not, probably other currently unknown conditions are not met." 12 78
     fi
   fi
 }
@@ -1745,8 +1897,7 @@ read_storages_info() {
 read_interfaces_info() {
 
   _interfaces_info=$(read_interfaces)
-
-  echo $_interfaces_info
+  _valid_interfaces='[]'
 
   # Cycle interfaces to obtain additional information
   while read -r _interface; do
@@ -1758,33 +1909,112 @@ read_interfaces_info() {
     if [ -z "$_speed" ] || [ "$_speed" = "Unknown!" ]; then
       _speed=0
     elif [[ $_speed =~ [0-9]+[MG] ]]; then
-      # Se _speed è nel formato '1000M' o '1G', estrai il numero
+      # If _speed is in the format '1000M' or '1G', extract the number
       _speed=$(echo $_speed | sed -e 's/[MG]//')
     else
-      DEBUG "The speed value '$_speed' for the interface '$_iname' is not valid."
+      whiptail --title "Speed value not valid." --msgbox "The speed value '$_speed' for the interface '$_iname' is not valid. The interface will be excluded." 10 60
+      WARN "The speed value '$_speed' for the interface '$_iname' is not valid. The interface will be excluded."
       _speed=0
     fi
     # WoL
-    _wol=$($SUDO ethtool "$_iname" | grep 'Supports Wake-on' | sed -e 's/Supports Wake-on://g' -e 's/[[:space:]]*//g')
+    _wol=$($SUDO ethtool "$_iname" | grep 'Wake-on' | grep -v 'Supports Wake-on' | sed -e 's/Wake-on://g' -e 's/[[:space:]]*//g')
 
-    if [ -n "$_wol" ] || [ "$_speed" -e 0 ]; then
-      DEBUG "Updating interfaces"
-      # Update interfaces
-      _interfaces_info=$(
-        printf '%s\n' "$_interfaces_info" |
-          jq \
-            --arg iname "$_iname" \
-            --arg speed "$_speed" \
-            --arg wol "$_wol" \
-            'map(if .name == $iname then . + {"speed": $speed | tonumber, "wol": ($wol | split(""))} else . end)'
-      )
+    # case $_wol in
+    # *g*)
+    #   # Supported WOL
+    #   if [ "$_wol" == d ]; then
+    #     INFO "Wake-On-LAN for interface '$_iname' is disabled."
+    #     # Ask the user if he wants to enable the WOL
+    #     read -p "Do you want to enable Wake-On-LAN '$_iname'? [Y/n] " answer
+    #     # Default case yes
+    #     if [ -z "$answer" ] || [ "$answer" = "Y" ] || [ "$answer" = "y" ]; then
+    #       # Enabling Wake-On-LAN
+    #       $SUDO ethtool -s "$_iname" wol g
+    #       INFO "Wake-on-LAN enabled for interface '$_iname'."
+    #     else
+    #       WARN "Wake-on-LAN enabling failed for interface '$_iname'."
+    #     fi
+    #   else
+    #     INFO "Wake-On-LAN already enabled for interface '$_iname'."
+    #   fi
+    #   ;;
+    # *)
+    #   # Wake-on-LAN non supportato
+    #   INFO "Interface '$_iname' doesn't support Wake-on-LAN"
+    #   ;;
+    # esac
 
-    else
-      DEBUG "Removing not valid interface '$_iname'"
-      _interfaces_info=$(printf '%s\n' "$_interfaces_info" | jq --arg elem "$_iname" 'map(select(.name != $elem))')
+    #!/bin/bash
 
+    case $_wol in
+    *g*)
+      # Supported WOL
+      if [ "$_wol" == "d" ]; then
+        whiptail --title "Info" --msgbox "Wake-On-LAN for interface '$_iname' is disabled." 8 78
+        INFO "Wake-On-LAN for interface '$_iname' is disabled."
+        # Ask the user if he wants to enable the WOL
+        if whiptail --title "Enable WOL" --yesno "Do you want to enable Wake-On-LAN for '$_iname'?" 8 78; then
+          # Enabling Wake-On-LAN
+          $SUDO ethtool -s "$_iname" wol g
+          whiptail --title "WOL Enabled" --msgbox "Wake-on-LAN enabled for interface '$_iname'." 8 78
+          INFO "Wake-on-LAN enabled for interface '$_iname'."
+          _supports_wol=1
+        else
+          whiptail --title "WOL Not Enabled" --msgbox "Wake-on-LAN enabling failed for interface '$_iname'." 8 78
+          WARN "Wake-on-LAN enabling failed for interface '$_iname'."
+          _supports_wol=0
+        fi
+      else
+        whiptail --title "Info" --msgbox "Wake-On-LAN already enabled for interface '$_iname'." 8 78
+        INFO "Wake-On-LAN already enabled for interface '$_iname'."
+        _supports_wol=1
+      fi
+      ;;
+    *)
+      _supports_wol=0
+      # Wake-on-LAN not supported
+      whiptail --title "Info" --msgbox "Interface '$_iname' doesn't support Wake-on-LAN" 8 78
+      ;;
+    esac
+
+    # Update method for valid interfaces list
+    update_valid_interfaces() {
+      _valid_interfaces=$(echo $_valid_interfaces | jq \
+        --arg iname "$_iname" \
+        --arg speed "$_speed" \
+        --arg wol "$_wol" \
+        'map(if .name == $iname then . + {"speed": ($speed | tonumber), "wol": ($wol | split(""))} else . end)')
+
+      INFO "Updated valid interfaces' list: $_valid_interfaces"
+    }
+
+    ### Cases management ###
+
+    #1: No WOL support, but valid speed.
+    if [ $_supports_wol -eq 0 ] && [ "$_speed" -ne 0 ]; then
+      #1.1: The current node is an initiator node.
+      if [ "$INIT_CLUSTER" = true ]; then
+        if whiptail --title "Check Interface Support" --yesno "It seems like the interface '$_iname' is not supporting Wake-on-LAN or it can't be enabled. Since this machine is going to be configured as initiator node, and Wake-on-Lan is not needed, do you want to add this interface to the list of valid interfaces?" 12 78 --defaultyes; then
+          update_valid_interfaces
+        else
+          INFO "The current interface '$_iname' has been excluded as the user marked it as not valid."
+        fi
+      fi
+    #2: WOL support and valid speed, valid interface.
+    elif [ $_supports_wol -eq 1 ] && [ "$_speed" -ne 0 ]; then
+      if whiptail --title "Check Interface Support" --yesno "The interface '$_iname' is supporting Wake-on-LAN, and appears to be perfectly valid to be used as node management interface. Do you want to add it to the list of valid interfaces?" 12 78 --defaultyes; then
+        update_valid_interfaces
+      else
+        INFO "The current interface '$_iname' has been excluded by the user."
+      fi
+    #3: No valid speed, can't use the interface.
+    elif [ "$_speed" -eq 0 ]; then
+      whiptail --title "Info" --msgbox "Interface '$_iname' is not valid (unable to read speed value) and it is going to be excluded." 8 78
+      INFO "Interface '$_iname' is not valid (unable to read speed value) and it is going to be excluded."
     fi
   done <<EOF
+
+
 $(printf '%s\n' "$_interfaces_info" | jq --compact-output '.[]')
 EOF
 
@@ -2540,35 +2770,6 @@ EOF
   while read -r _interface; do
     # Name
     _iname=$(printf '%s\n' "$_interface" | jq --raw-output '.name')
-    # Supports WoL
-    _supports_wol=$($SUDO ethtool "$_iname" | grep 'Supports Wake-on' | sed -e 's/Supports Wake-on://g' -e 's/[[:space:]]*//g')
-
-    case $_supports_wol in
-    *g*)
-      # Supported WOL
-      _wol=$($SUDO ethtool "$_iname" | grep 'Wake-on' | grep -v 'Supports Wake-on' | sed -e 's/Wake-on://g' -e 's/[[:space:]]*//g')
-      if [ "$_wol" != d ]; then
-        INFO "Wake-On-LAN for interface '$_iname' is disabled."
-        # Aske the user if he wants to enable the WOL
-        read -p "Do you want to enable Wake-On-LAN '$_iname'? [Y/n] " answer
-        # Default case yes
-        if [ -z "$answer" ] || [ "$answer" = "Y" ] || [ "$answer" = "y" ]; then
-          # Enabling Wake-On-LAN
-          $SUDO ethtool -s "$_iname" wol b
-          INFO "Wake-on-LAN enabled for interface '$_iname'."
-        else
-          FATAL "Wake-on-LAN not enabled for interface '$_iname'."
-        fi
-      else
-        INFO "Wake-On-LAN already enabled for interface '$_iname'."
-      fi
-      ;;
-    *)
-      # Wake-on-LAN non supportato
-      INFO "Interface '$_iname' doesn't support Wake-on-LAN"
-      ;;
-    esac
-
   done <<EOF
 $(printf '%s\n' "$_interfaces" | jq --compact-output '.[]')
 EOF
@@ -3752,7 +3953,7 @@ configure_k8s() {
     --selector=app=registry \
     "--timeout=$_k8s_timeout"
 
-  # Autoscaler CA
+  # Autoscaler CAVERIFY_SY
   INFO "Replacing Autoscaler CA token"
   sed -i "s^\${{ __.token }}^$AUTOSCALER_TOKEN^" "$_autoscaler_ca_deployment"
   # TODO Do for all images
