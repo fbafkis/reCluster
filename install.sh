@@ -770,6 +770,8 @@ NODE_FACTS='{}'
 TMP_DIR=
 #Sysbench binary path
 SYSBENCH_PATH=
+#Valid interfaces
+_valid_interfaces='[]'
 
 # ================
 # CLEANUP
@@ -977,34 +979,6 @@ assert_user() {
 
 ### Sysbench management methods
 
-# Check Sysbench status
-# check_sysbench() {
-#   INFO "Checking if the Sysbench command is working properly."
-
-#   # Check if Sysbench command is present and working
-#   if command sysbench --help >/dev/null 2>&1; then
-#     sysbench_error=$? # Capture exit code
-#     DEBUG "Sysbench exit code: $sysbench_error."
-#     if [[ $sysbench_error -eq 126 ]]; then # Check for "Command not found"
-#       FATAL "Sysbench command not found. Please install it."
-#     elif [[ $sysbench_error -eq 132 ]]; then # Check for "Illegal instruction"
-#       INFO "Sysbench encountered 'Illegal instruction' error. Looking for possible causes..."
-
-#       # Perform CPU's specs checking
-#       check_cpu_specs
-#       compile_sysbench
-#     else
-#       INFO "Sysbench exited unexpectedly (exit code: $sysbench_error) because of currently unknown
-#     reasons. Please check the exit code. You can anyway try to proceed compiling Sysbench from source."
-#       compile_sysbench
-#     fi
-#   else
-#     INFO "Sysbench is present and working properly."
-#   fi
-# }
-
-#!/bin/bash
-
 check_sysbench() {
   whiptail --title "Check Sysbench" --msgbox "Checking if the Sysbench command is working properly." 8 78
 
@@ -1022,7 +996,7 @@ check_sysbench() {
       compile_sysbench
     else
       whiptail --title "Error" --msgbox "Sysbench exited unexpectedly (exit code: $sysbench_error) because of currently unknown reasons. Please check the exit code. You can anyway try to proceed compiling Sysbench from source." 10 78
-      compile_sysbench
+      #compile_sysbench
     fi
   else
     whiptail --title "Info" --msgbox "Sysbench is present and working properly." 8 78
@@ -1030,133 +1004,6 @@ check_sysbench() {
 }
 
 # Compile Sysbench
-# compile_sysbench() {
-
-#   # List of required packages for Sysbench compilation
-#   _sysbench_packages="g++ autoconf make automake libtool pkgconfig libaio-dev"
-
-#   read -p "Do you want to proceed compiling and autoconfiguring Sysbench from source? NOTE: without a working instance of
-#   Sysbench, the recluster installation will be terminated. (Y/n) " yn
-
-#   # Set default answer to "Y" if empty input
-#   yn=${yn:-Y}
-
-#   case $yn in
-#   [Yy]*)
-#     INFO "Continuing..."
-#     # Remove already present pre compiled version of sysbench
-#     DEBUG "Removing pre compiled version of Sysbench."
-#     apk del sysbench
-
-#     # Check the internet connection
-
-#     if curl --output /dev/null --silent --head --fail http://www.google.com; then
-#       # Update apk database
-#       apk update
-#     else
-#       WARN "No internet connection, if some packages are missing, it will be impossible to install them automatically."
-#     fi
-
-#     # Install all the required packages
-#     DEBUG "Installing required packageS..."
-#     for package in $_sysbench_packages; do
-#       add_package "$package"
-#     done
-
-#     # Clean apk cache
-#     apk cache clean
-#     DEBUG "Require packages installation process is completed."
-
-#     # Sysbench arechive
-#     _sysbench_archive_name="./dependencies/sysbench.tar.gz"
-
-#     # Specifying tmp drectory
-#     _sysbench_tmp_directory="./dependencies/sysbench_tmp"
-
-#     # Main current installation directory
-#     _main_install_directory=$(pwd)
-
-#     # Create tmp directory
-#     DEBUG "Creating temporary folder for Sysbench compilation..."
-#     rm -rf ./dependencies/sysbench_tmp
-#     mkdir ./dependencies/sysbench_tmp
-
-#     # Extracting the Sysbench archive
-#     DEBUG "Extracting the Sysbench source archive..."
-#     tar -xzf "$_sysbench_archive_name" -C "$_sysbench_tmp_directory" || {
-#       FATAL "Error while extracting the Sysbench archive."
-#     }
-
-#     # Find the extracted subdirectory
-#     _subdirectory_name=$(tar -tf "$_sysbench_archive_name" | head -n 1 | cut -d '/' -f 1)
-
-#     # Going into the Sysbench tmp directory.
-#     DEBUG "Entering the temporary folder..."
-#     if ! cd "$_sysbench_tmp_directory/$_subdirectory_name"; then
-#       FATAL "Could not get into Sysbench installation directory."
-#     fi
-
-#     # Autogen
-#     DEBUG "Running the Sysbench autogen script..."
-#     if ! ./autogen.sh >/dev/null; then
-#       FATAL "Error in running Sysbench autogen script."
-#     fi
-
-#     # Configure
-#     DEBUG "Runnning the Sysbench configuration script..."
-#     if ! ./configure --without-mysql >/dev/null; then
-#       FATAL "Error in running Sysbench configure script."
-#     fi
-
-#     # Make
-#     DEBUG "Running Sysbench make script..."
-#     if ! make -j >/dev/null; then
-#       FATAL "Error in running Sysbench make script."
-#     fi
-
-#     # Renaming the binary
-
-#     DEBUG "Renaming the Sysbench binary to \"recluster_sysbench\"."
-#     mv ./src/sysbench ./src/recluster_sysbench
-
-#     #TODO: Check if Sysbench now actually works.
-
-#     # Asking the user if he wants to install the working Sysbench into the system.
-
-#     read -p "Now a working instance of Sysbench is available. Do you want to proceed installing
-#     this on the system so that it will be available after the end of the installation? Otherwise
-#     it will be removed when the installation ends. (y/N) " yn
-
-#     # Set default answer to "Y" if empty input
-#     yn=${yn:-N}
-#     case $yn in
-#     [Yy]*)
-#       INFO "Installing the sysbench binary to the ~/bin/ location."
-#       cp ./src/recluster_sysbench ~/bin/
-#       SYSBENCH_PATH="~/bin/"
-#       ;;
-#     [Nn]*)
-#       INFO "The Sysbench binary will remain to the temporary location and will be removed after installation's ending."
-#       SYSBENCH_PATH="$_sysbench_tmp_directory/$_subdirectory_name/src"
-#       ;;
-#     *)
-#       echo "Please answer yes (y) or no (n)."
-#       ;;
-#     esac
-#     cd "$_main_install_directory"
-#     INFO "Sysbench compiling, configuration and installation completed successfully."
-#     ;;
-#   [Nn]*)
-#     FATAL "Without a working instance of Sysbench the reCluster installation can't proceed. Aborting..."
-#     cd "$_main_install_directory"
-#     ;;
-#   *)
-#     echo "Please answer yes (y) or no (n)."
-#     ;;
-#   esac
-# }
-
-#!/bin/bash
 
 compile_sysbench() {
 
@@ -1170,7 +1017,8 @@ compile_sysbench() {
     apk del sysbench
 
     # Check the internet connection
-    if curl --output /dev/null --silent --head --fail http://www.google.com; then
+    #if curl --output /dev/null --silent --head --fail http://www.google.com; then
+    if wget --spider --quiet http://www.google.com; then
       # Update apk database
       apk update
     else
@@ -1537,9 +1385,12 @@ setup_certificates() {
 # Read interfaces
 read_interfaces() {
   ip -details -json link show |
-    jq '
-        map(select((.linkinfo.info_kind // .link_type) != "loopback") | {address, name: .ifname})
+    jq \
       '
+          map(if .linkinfo.info_kind // .link_type == "loopback" then empty else . end)
+          | map(.name = .ifname)
+          | map({address, name})
+        '
 }
 
 # Read power consumption
@@ -1894,15 +1745,120 @@ read_storages_info() {
 }
 
 # Read interface(s) information
+
+### Aux methods ###
+
+# Update method for valid interfaces list
+update_valid_interfaces() {
+  _valid_interfaces=$(echo "$_valid_interfaces" | jq \
+    --arg iname "$_iname" \
+    --arg speed "$_speed" \
+    --arg wol "$_wol" \
+    --arg address "$_address" \
+    '
+      if length == 0 then
+        [{"name": $iname, "speed": ($speed | tonumber), "wol": ($wol | split("")), "address": $address, "control_interface": 0}]
+      else
+        map(if .name == $iname then
+          . + {"speed": ($speed | tonumber), "wol": ($wol | split("")), "address": $address, "control_interface": 0}
+        else
+          .
+        end)
+        | if any(.name == $iname) then
+            .
+          else
+            . + [{"name": $iname, "speed": ($speed | tonumber), "wol": ($wol | split("")), "address": $address, "control_interface": 0}]
+          end
+      end
+    ')
+
+  DEBUG "Updated valid interfaces' list: $_valid_interfaces"
+}
+
+# Let the user choose the interface
+select_interface() {
+
+  # Controlla se l'array è vuoto
+  if [ -z "$_valid_interfaces" ] || [ "$_valid_interfaces" = "[]" ]; then
+    if whiptail --title "No Valid Interfaces" --yesno "There are no valid interfaces available. Would you like to retry fetching the interface info?" 10 60; then
+      read_interfaces_info
+      return
+    else
+      FATAL "With no interfaces available it is not possible to go on with the installation. Aborting..."
+    fi
+  fi
+
+  # Estrai i dati delle interfacce dal JSON
+  interfaces=$(echo "$_valid_interfaces" | jq -c '.[]')
+
+  # Debug: verifica i dati delle interfacce estratte
+  DEBUG "Interfaces' data: $interfaces"
+
+  # Prepara i dati per whiptail
+  whiptail_args=""
+  first_option=true
+  for interface in $interfaces; do
+    name=$(echo "$interface" | jq -r '.name')
+    address=$(echo "$interface" | jq -r '.address')
+    speed=$(echo "$interface" | jq -r '.speed')
+    wol=$(echo "$interface" | jq -r '.wol | join(", ")')
+    control_interface=$(echo "$interface" | jq -r '.control_interface')
+
+    # Converti control_interface in true o false
+    if [ "$control_interface" -eq 1 ]; then
+      control_interface="true"
+    else
+      control_interface="false"
+    fi
+
+    description="Address: $address, Speed: $speed, WOL: $wol, Controller: $control_interface"
+
+    if [ "$first_option" = true ]; then
+      whiptail_args="$whiptail_args \"$name\" \"$description\" ON"
+      first_option=false
+    else
+      whiptail_args="$whiptail_args \"$name\" \"$description\" OFF"
+    fi
+  done
+
+  # Debug: verifica gli argomenti preparati per whiptail
+  echo "Argomenti per whiptail: $whiptail_args"
+
+  # Costruisci il comando per whiptail in modo sicuro
+  whiptail_command="whiptail --radiolist \"Scegli un'interfaccia di rete\" 20 100 10 $whiptail_args 3>&1 1>&2 2>&3"
+
+  # Esegui il comando whiptail e cattura l'output
+  selected_interface=$(sh -c "$whiptail_command")
+
+  # Verifica se l'utente ha selezionato un'opzione
+  if [ $? -eq 0 ]; then
+    INFO "You chose interface $selected_interface."
+
+    # Aggiorna il campo control_interface a 1 per l'interfaccia selezionata
+    _valid_interfaces=$(echo "$_valid_interfaces" | jq --arg sel "$selected_interface" 'map(if .name == $sel then .control_interface = 1 else . end)')
+
+    # Stampa il nuovo array JSON
+    DEBUG "Updated valid interfaces' list: $_valid_interfaces"
+  else
+    if (whiptail --title "No interface chosen" --yesno "No interface was chose, and one is required to proceed with reCluster installation. Do you want to start over?" 10 60); then
+      select_interface
+    else
+      FATAL "You can't proceed with reCluster installation without choosing an interface. Aborting..."
+    fi
+  fi
+
+}
+
+# iInterface management method
 read_interfaces_info() {
 
   _interfaces_info=$(read_interfaces)
-  _valid_interfaces='[]'
+  ### Cycle over interfaces to obtain additional information ###
 
-  # Cycle interfaces to obtain additional information
-  while read -r _interface; do
-    # Name
-    _iname=$(printf '%s\n' "$_interface" | jq --raw-output '.name')
+  echo "$_interfaces_info" | jq -r '.[] | "\(.name) \(.address)"' >$TMP_DIR/interfaces_info.txt
+
+  while read -r _iname _address; do
+    INFO "Processing $_iname with address $_address" # Name
 
     # Speed
     _speed=$($SUDO ethtool "$_iname" | grep Speed | sed -e 's/Speed://g' -e 's/[[:space:]]*//g' -e 's/b.*//')
@@ -1911,63 +1867,38 @@ read_interfaces_info() {
     elif [[ $_speed =~ [0-9]+[MG] ]]; then
       # If _speed is in the format '1000M' or '1G', extract the number
       _speed=$(echo $_speed | sed -e 's/[MG]//')
+      DEBUG "Valid speed value $_speed read for interface $_iname ."
     else
+      INFO "$_speed"
       whiptail --title "Speed value not valid." --msgbox "The speed value '$_speed' for the interface '$_iname' is not valid. The interface will be excluded." 10 60
       WARN "The speed value '$_speed' for the interface '$_iname' is not valid. The interface will be excluded."
       _speed=0
     fi
+
     # WoL
     _wol=$($SUDO ethtool "$_iname" | grep 'Wake-on' | grep -v 'Supports Wake-on' | sed -e 's/Wake-on://g' -e 's/[[:space:]]*//g')
-
-    # case $_wol in
-    # *g*)
-    #   # Supported WOL
-    #   if [ "$_wol" == d ]; then
-    #     INFO "Wake-On-LAN for interface '$_iname' is disabled."
-    #     # Ask the user if he wants to enable the WOL
-    #     read -p "Do you want to enable Wake-On-LAN '$_iname'? [Y/n] " answer
-    #     # Default case yes
-    #     if [ -z "$answer" ] || [ "$answer" = "Y" ] || [ "$answer" = "y" ]; then
-    #       # Enabling Wake-On-LAN
-    #       $SUDO ethtool -s "$_iname" wol g
-    #       INFO "Wake-on-LAN enabled for interface '$_iname'."
-    #     else
-    #       WARN "Wake-on-LAN enabling failed for interface '$_iname'."
-    #     fi
-    #   else
-    #     INFO "Wake-On-LAN already enabled for interface '$_iname'."
-    #   fi
-    #   ;;
-    # *)
-    #   # Wake-on-LAN non supportato
-    #   INFO "Interface '$_iname' doesn't support Wake-on-LAN"
-    #   ;;
-    # esac
-
-    #!/bin/bash
-
+    INFO "Wol: $_wol"
     case $_wol in
-    *g*)
+    *g* | *b*)
       # Supported WOL
-      if [ "$_wol" == "d" ]; then
-        whiptail --title "Info" --msgbox "Wake-On-LAN for interface '$_iname' is disabled." 8 78
-        INFO "Wake-On-LAN for interface '$_iname' is disabled."
-        # Ask the user if he wants to enable the WOL
-        if whiptail --title "Enable WOL" --yesno "Do you want to enable Wake-On-LAN for '$_iname'?" 8 78; then
-          # Enabling Wake-On-LAN
-          $SUDO ethtool -s "$_iname" wol g
-          whiptail --title "WOL Enabled" --msgbox "Wake-on-LAN enabled for interface '$_iname'." 8 78
-          INFO "Wake-on-LAN enabled for interface '$_iname'."
-          _supports_wol=1
-        else
-          whiptail --title "WOL Not Enabled" --msgbox "Wake-on-LAN enabling failed for interface '$_iname'." 8 78
-          WARN "Wake-on-LAN enabling failed for interface '$_iname'."
-          _supports_wol=0
-        fi
-      else
-        whiptail --title "Info" --msgbox "Wake-On-LAN already enabled for interface '$_iname'." 8 78
-        INFO "Wake-On-LAN already enabled for interface '$_iname'."
+      whiptail --title "Info" --msgbox "Wake-On-LAN already enabled for interface '$_iname'." 8 78
+      INFO "Wake-On-LAN already enabled for interface '$_iname'."
+      _supports_wol=1
+      ;;
+    *d*)
+      whiptail --title "Info" --msgbox "Wake-On-LAN for interface '$_iname' is disabled." 8 78
+      INFO "Wake-On-LAN for interface '$_iname' is disabled."
+      # Ask the user if he wants to enable the WOL
+      if whiptail --title "Enable WOL" --yesno "Do you want to enable Wake-On-LAN for '$_iname'?" 8 78; then
+        # Enabling Wake-On-LAN
+        $SUDO ethtool -s "$_iname" wol g
+        whiptail --title "WOL Enabled" --msgbox "Wake-on-LAN enabled for interface '$_iname'." 8 78
+        INFO "Wake-on-LAN enabled for interface '$_iname'."
         _supports_wol=1
+      else
+        whiptail --title "WOL Not Enabled" --msgbox "Wake-on-LAN enabling failed for interface '$_iname'." 8 78
+        WARN "Wake-on-LAN enabling failed for interface '$_iname'."
+        _supports_wol=0
       fi
       ;;
     *)
@@ -1977,24 +1908,13 @@ read_interfaces_info() {
       ;;
     esac
 
-    # Update method for valid interfaces list
-    update_valid_interfaces() {
-      _valid_interfaces=$(echo $_valid_interfaces | jq \
-        --arg iname "$_iname" \
-        --arg speed "$_speed" \
-        --arg wol "$_wol" \
-        'map(if .name == $iname then . + {"speed": ($speed | tonumber), "wol": ($wol | split(""))} else . end)')
-
-      INFO "Updated valid interfaces' list: $_valid_interfaces"
-    }
-
     ### Cases management ###
 
     #1: No WOL support, but valid speed.
     if [ $_supports_wol -eq 0 ] && [ "$_speed" -ne 0 ]; then
       #1.1: The current node is an initiator node.
       if [ "$INIT_CLUSTER" = true ]; then
-        if whiptail --title "Check Interface Support" --yesno "It seems like the interface '$_iname' is not supporting Wake-on-LAN or it can't be enabled. Since this machine is going to be configured as initiator node, and Wake-on-Lan is not needed, do you want to add this interface to the list of valid interfaces?" 12 78 --defaultyes; then
+        if whiptail --title "Check Interface Support" --yesno "It seems like the interface '$_iname' is not supporting Wake-on-LAN or it can't be enabled. Since this machine is going to be configured as initiator node, and Wake-on-Lan is not needed, do you want to add this interface to the list of valid interfaces?" 12 78; then
           update_valid_interfaces
         else
           INFO "The current interface '$_iname' has been excluded as the user marked it as not valid."
@@ -2002,7 +1922,7 @@ read_interfaces_info() {
       fi
     #2: WOL support and valid speed, valid interface.
     elif [ $_supports_wol -eq 1 ] && [ "$_speed" -ne 0 ]; then
-      if whiptail --title "Check Interface Support" --yesno "The interface '$_iname' is supporting Wake-on-LAN, and appears to be perfectly valid to be used as node management interface. Do you want to add it to the list of valid interfaces?" 12 78 --defaultyes; then
+      if whiptail --title "Check Interface Support" --yesno "The interface '$_iname' is supporting Wake-on-LAN, and appears to be perfectly valid to be used as node management interface. Do you want to add it to the list of valid interfaces?" 12 78; then
         update_valid_interfaces
       else
         INFO "The current interface '$_iname' has been excluded by the user."
@@ -2012,14 +1932,15 @@ read_interfaces_info() {
       whiptail --title "Info" --msgbox "Interface '$_iname' is not valid (unable to read speed value) and it is going to be excluded." 8 78
       INFO "Interface '$_iname' is not valid (unable to read speed value) and it is going to be excluded."
     fi
-  done <<EOF
+  done <$TMP_DIR/interfaces_info.txt
+  rm $TMP_DIR/interfaces_info.txt
 
+  INFO "Valid interfaces before selection: $_valid_interfaces".
 
-$(printf '%s\n' "$_interfaces_info" | jq --compact-output '.[]')
-EOF
+  select_interface
 
   # Return
-  RETVAL=$_interfaces_info
+  RETVAL=$_valid_interfaces
 }
 
 # Execute CPU benchmark
