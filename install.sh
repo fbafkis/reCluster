@@ -769,9 +769,7 @@ NODE_FACTS='{}'
 # Temporary directory
 TMP_DIR=
 #Sysbench binary path
-SYSBENCH_PATH=
-#Valid interfaces
-_valid_interfaces='[]'
+SYSBENCH_PATH="/usr/bin/sysbench"
 
 # ================
 # CLEANUP
@@ -779,27 +777,25 @@ _valid_interfaces='[]'
 cleanup() {
   # Exit code
   _exit_code=$?
+
   [ $_exit_code = 0 ] || WARN "Cleanup exit code $_exit_code"
 
   cd $_main_install_directory
   # Cleanup temporary directory
   cleanup_dir "$TMP_DIR"
 
-  ############################
-
   # Cleanup Sysbench compiling tmp directory
   cleanup_dir "$_sysbench_tmp_directory"
-
-  ###########################
 
   # Cleanup spinner
   cleanup_spinner
 
   exit "$_exit_code"
+
 }
 
 # Trap
-trap cleanup INT QUIT TERM EXIT
+trap cleanup QUIT TERM EXIT
 
 # ================
 # FUNCTIONS
@@ -979,31 +975,61 @@ assert_user() {
 
 ### Sysbench management methods
 
+# Sysbench status check method
 check_sysbench() {
   whiptail --title "Check Sysbench" --msgbox "Checking if the Sysbench command is working properly." 8 78
 
-  # Check if Sysbench command is present and working
-  if command sysbench --help >/dev/null 2>&1; then
-    sysbench_error=$?                      # Capture exit code
-    if [[ $sysbench_error -eq 126 ]]; then # Check for "Command not found"
-      whiptail --title "Error" --msgbox "Sysbench command not found. Please install it." 8 78
-      return 1
-    elif [[ $sysbench_error -eq 132 ]]; then # Check for "Illegal instruction"
-      whiptail --title "Error" --msgbox "Sysbench encountered an 'Illegal instruction' error. Looking for possible causes..." 10 78
+  # Disabling the automatic error interruption for the script.
+  set +e
+  $SYSBENCH_PATH cpu --cpu-max-prime=10 run
+  exit_code=$?
+  # Re-enabling the automatic error interruption for the script.
+  set -e
 
-      # Perform CPU's specs checking
-      check_cpu_specs
-      compile_sysbench
+  # Print the sysbench exit error.
+  DEBUG "Sysbench exit code: $exit_code"
+
+  # Management of different exit code cases.
+  # Illegal instruction case (code 132)
+  if [ $exit_code -eq 132 ]; then
+    whiptail --title "Error" --msgbox "Sysbench encountered an 'Illegal instruction' error. Looking for possible causes..." 10 78
+    # Perform CPU's specs checking
+    check_cpu_specs
+    compile_sysbench
+    # Command not found case (code 126)
+  elif [ $exit_code -eq 127 ]; then
+    whiptail --title "Error" --msgbox "Sysbench command not found. Please install it." 8 78
+    # Ask the user if he wants to install Sysbench using the apk paceket manager, only if there is an internet connection.
+    if wget --spider --quiet http://www.google.com; then
+      if whiptail --title "Sysbench installation" --yesno "Do you want to install it using the apk packet manager?" 8 78; then
+        # Install sysbench
+        apk update
+        apk add sysbench
+        # Updating the sysbench binary path
+        SYSBENCH_PATH="/usr/bin/sysbench"
+        whiptail --title "Installation successful" --msgbox "Sysbench installation through apk packet manager succeded." 10 78
+        # Call again the check_system method.
+        check_sysbench
+      else
+        whiptail --title "Installation refused" --msgbox "The user has refused to install Sysbench through the apk packet manager. You can still proceed compiling Sysbench from source." 10 78
+        compile_sysbench
+      fi
     else
-      whiptail --title "Error" --msgbox "Sysbench exited unexpectedly (exit code: $sysbench_error) because of currently unknown reasons. Please check the exit code. You can anyway try to proceed compiling Sysbench from source." 10 78
-      #compile_sysbench
+      # If there is no internet connection, notify the user to install sysbench offline.
+      whiptail --title "Network Error" --msgbox "No internet connection, it is not possible to install Sysbench automatically using the apk packet manager. You can still proceed compiling Sysbench from source." 10 78
+      compile_sysbench
     fi
+
+  elif [ $exit_code -ne 0 ]; then
+    whiptail --title "Error" --msgbox "Sysbench exited unexpectedly (exit code: $exit_code) because of currently unknown reasons. Please check the exit code. You can anyway try to proceed compiling Sysbench from source." 10 78
+    compile_sysbench
   else
     whiptail --title "Info" --msgbox "Sysbench is present and working properly." 8 78
+    INFO "Sysbench is present and working properly."
   fi
 }
 
-# Compile Sysbench
+# Compile Sysbench method
 
 compile_sysbench() {
 
@@ -1017,7 +1043,6 @@ compile_sysbench() {
     apk del sysbench
 
     # Check the internet connection
-    #if curl --output /dev/null --silent --head --fail http://www.google.com; then
     if wget --spider --quiet http://www.google.com; then
       # Update apk database
       apk update
@@ -1055,7 +1080,7 @@ compile_sysbench() {
     # Find the extracted subdirectory
     _subdirectory_name=$(tar -tf "$_sysbench_archive_name" | head -n 1 | cut -d '/' -f 1)
 
-    # Going into the Sysbench tmp directory.
+    # Going into the Sysbench tmp directory
     if ! cd "$_sysbench_tmp_directory/$_subdirectory_name"; then
       whiptail --title "Error" --msgbox "Could not get into Sysbench installation directory." 10 78
       return 1
@@ -1076,15 +1101,22 @@ compile_sysbench() {
     # Asking user if they want to install the working Sysbench into the system
     if whiptail --title "Sysbench Installation" --yesno "Now a working instance of Sysbench is available. Do you want to proceed installing this on the system so that it will be available after the end of the installation? Otherwise it will be removed when the installation ends. (y/N)" 12 78; then
       whiptail --title "Installation" --infobox "Installing the sysbench binary to the ~/bin/ location." 8 78
+      # Creating the installation folder inside the current user home directory
+      mkdir -p ~/bin/
+      # Moving the binary
       cp ./src/recluster_sysbench ~/bin/
-      SYSBENCH_PATH="~/bin/"
+      # Updating the sysbench binary path
+      SYSBENCH_PATH="$HOME/bin/recluster_sysbench"
     else
       whiptail --title "Temporary Installation" --infobox "The Sysbench binary will remain to the temporary location and will be removed after installation's ending." 8 78
-      SYSBENCH_PATH="$_sysbench_tmp_directory/$_subdirectory_name/src"
+      # Updating the sysbench binary path
+      SYSBENCH_PATH="$_sysbench_tmp_directory/$_subdirectory_name/src/recluster_sysbench"
     fi
 
     cd "$_main_install_directory"
     whiptail --title "Success" --msgbox "Sysbench compiling, configuration and installation completed successfully." 10 78
+    INFO "Checking if sysbench now is working"
+    check_sysbench
   else
     whiptail --title "Aborted" --msgbox "Without a working instance of Sysbench the reCluster installation can't proceed. Aborting..." 10 78
     cd "$_main_install_directory"
@@ -1112,47 +1144,6 @@ add_package() {
     fi
   fi
 }
-
-# Check CPU instruction sets support
-# check_cpu_specs() {
-#   local cpuinfo_file="/proc/cpuinfo"
-
-#   # Check for AVX flag
-#   avx_present=$(grep -iq "avx" "$cpuinfo_file" && echo true || echo false)
-#   DEBUG "Sysbench installation debugging: AVX instruction set: ${avx_present}"
-
-#   # Check for F16C flag
-#   f16c_present=$(grep -iq "f16c" "$cpuinfo_file" && echo true || echo false)
-#   DEBUG "Sysbench installation debugging: F16C instruction set: ${f16c_present}"
-
-#   # Check the CPUID level
-#   cpuid_level=$(grep -E '^cpuid level' "$cpuinfo_file" | cut -d ':' -f2 | tr -dc '[:digit:]')
-
-#   if [$avx_present && !$f16c_present]; then
-#     INFO "The AVX instruction set is supported by your CPU but the F16C instruction set is not. This is the
-#     reason because the pre compiled version of Sysbench installed through the APK packet manager is not working.
-#     Do yout want to proceed uninstalling the pre compiled version of Sysbench previously installed through the APK
-#     packet manager and proceed with compilation from source?"
-#   elif [!$avx_present && $f16c_present]; then
-#     INFO "The AVX instruction set is not supported by your CPU but the F16C instruction set is. This is the
-#     reason because the pre compiled version of Sysbench installed through the APK packet manager is not working."
-#   elif [!$avx_present && !$f16c_present]; then
-#     INFO "Neither the AVX instruction set nor the F16C instruction set are supported by your CPU. This is the
-#     reason because the pre compiled version of Sysbench installed through the APK packet manager is not working."
-#   elif [$avx_present && $f16c_present]; then
-#     INFO "Both the AVX instruction set and the F16C instruction set are supported by your CPU. Going to check the
-#     CPUID level of your CPU as further required condition."
-#     if [[ $cpuid_level -le 11 ]]; then
-#       INFO "Your CPU CPUID level is lower than or equal to 11. This is the
-#     reason because the pre compiled version of Sysbench installed through the APK packet manager is not working."
-#     else
-#       INFO "WARNING: Your CPU CPUID level is higher than 11 and all the other known requirements are met. Something unusual is happened,
-#       since the pre compiled Sysbench binary should be working. But it is not, probably other currently unknown conditions are not met."
-#     fi
-#   fi
-# }
-
-#!/bin/bash
 
 check_cpu_specs() {
   local cpuinfo_file="/proc/cpuinfo"
@@ -1853,6 +1844,9 @@ select_interface() {
 read_interfaces_info() {
 
   _interfaces_info=$(read_interfaces)
+  #Valid interfaces
+  _valid_interfaces='[]'
+
   ### Cycle over interfaces to obtain additional information ###
 
   echo "$_interfaces_info" | jq -r '.[] | "\(.name) \(.address)"' >$TMP_DIR/interfaces_info.txt
@@ -1946,7 +1940,7 @@ read_interfaces_info() {
 # Execute CPU benchmark
 run_cpu_bench() {
   _run_cpu_bench() {
-    $SYSBENCH_PATH/recluster_sysbench --time="$BENCH_TIME" --threads="$1" cpu run |
+    $SYSBENCH_PATH --time="$BENCH_TIME" --threads="$1" cpu run |
       grep 'events per second' |
       sed -e 's/events per second://g' -e 's/[[:space:]]*//g' |
       xargs printf "%.0f"
@@ -1981,7 +1975,7 @@ run_cpu_bench() {
 # Execute memory benchmark
 run_memory_bench() {
   _run_memory_bench() {
-    _memory_output=$($SYSBENCH_PATH/recluster_sysbench --time="$BENCH_TIME" --memory-oper="$1" --memory-access-mode="$2" memory run |
+    _memory_output=$($SYSBENCH_PATH --time="$BENCH_TIME" --memory-oper="$1" --memory-access-mode="$2" memory run |
       grep 'transferred' |
       sed -e 's/.*(\(.*\))/\1/' -e 's/B.*//' -e 's/[[:space:]]*//g' |
       numfmt --from=iec-i)
@@ -2040,12 +2034,12 @@ run_storages_bench() {
     write)
       _io_opt=written
       # Prepare write benchmark
-      $SYSBENCH_PATH/recluster_sysbench fileio cleanup >/dev/null
-      $SYSBENCH_PATH/recluster_sysbench fileio prepare >/dev/null
+      $SYSBENCH_PATH fileio cleanup >/dev/null
+      $SYSBENCH_PATH fileio prepare >/dev/null
       ;;
     esac
 
-    _io_output=$($SYSBENCH_PATH/recluster_sysbench --time="$BENCH_TIME" --file-test-mode="$2" --file-io-mode="$3" fileio run | grep "$_io_opt, ")
+    _io_output=$($SYSBENCH_PATH --time="$BENCH_TIME" --file-test-mode="$2" --file-io-mode="$3" fileio run | grep "$_io_opt, ")
     _io_throughput_value=$(printf '%s\n' "$_io_output" | sed -e 's/^.*: //' -e 's/[[:space:]]*//g')
     _io_throughput_unit=$(printf '%s\n' "$_io_output" | sed -e 's/.*,\(.*\)B\/s.*/\1/' -e 's/[[:space:]]*//g')
 
@@ -2057,8 +2051,8 @@ run_storages_bench() {
 
   # Prepare read benchmark
   DEBUG "Preparing storage(s) read benchmark"
-  $SYSBENCH_PATH/recluster_sysbench fileio cleanup >/dev/null
-  $SYSBENCH_PATH/recluster_sysbench fileio prepare >/dev/null
+  $SYSBENCH_PATH fileio cleanup >/dev/null
+  $SYSBENCH_PATH fileio prepare >/dev/null
 
   # Read sequential synchronous
   DEBUG "Running storage(s) benchmark in read sequential synchronous"
@@ -2102,7 +2096,7 @@ run_storages_bench() {
 
   # Clean
   DEBUG "Cleaning storage(s) benchmark"
-  $SYSBENCH_PATH/recluster_sysbench fileio cleanup >/dev/null
+  $SYSBENCH_PATH fileio cleanup >/dev/null
 
   # Return
   RETVAL=$(
@@ -2146,7 +2140,7 @@ run_storages_bench() {
 # Read CPU power consumption
 read_cpu_power_consumption() {
   _run_cpu_bench() {
-    $SYSBENCH_PATH/recluster_sysbench --time=0 --threads="$1" cpu run >/dev/null &
+    $SYSBENCH_PATH --time=0 --threads="$1" cpu run >/dev/null &
     read_power_consumption "$!"
   }
   _threads=$(grep -c ^processor /proc/cpuinfo)
@@ -2547,7 +2541,7 @@ verify_system() {
   assert_cmd sed
   assert_cmd ssh-keygen
   assert_cmd sudo
-  assert_cmd sysbench
+  #assert_cmd sysbench
   check_sysbench
   assert_cmd tar
   assert_cmd tee
