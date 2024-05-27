@@ -23,7 +23,7 @@
  */
 
 import type * as Prisma from '@prisma/client';
-import { GraphQLID, GraphQLString } from 'graphql';
+import { GraphQLID, GraphQLString, GraphQLBoolean } from 'graphql';
 import { Field, ObjectType } from 'type-graphql';
 import { GraphQLBigInt, GraphQLTimestamp } from 'graphql-scalars';
 import { WoLFlagEnum } from '~/db';
@@ -47,6 +47,9 @@ export class Interface implements Prisma.Interface {
     description: 'Interface Wake-on-Lan flags'
   })
   wol!: WoLFlagEnum[];
+
+  @Field(() => GraphQLBoolean, { description: 'Controller flag' })
+  controller!: boolean;
 
   @Field(() => GraphQLTimestamp, { description: 'Creation timestamp' })
   createdAt!: Date;

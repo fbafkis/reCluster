@@ -23,27 +23,25 @@
  */
 
 import type { Prisma } from '@prisma/client';
-import type { NodeRoleEnum, NodePermissionEnum } from '~/db';
-import type { CreateCpuInput } from './CreateCpuInput';
-import type { CreateStorageInput } from './CreateStorageInput';
-import type { CreateInterfaceInput } from './CreateInterfaceInput';
+import { ArgsType, Field } from 'type-graphql';
+import { FindManyArgs } from '~/types';
+import { OrderByUserInput, WherePowerOnDeviceInput } from '../../../inputs';
+import { PaginationArgs } from './PaginationArgs';
 
-export type CreateNodeInput = Omit<
-  Prisma.NodeCreateInput,
-  | 'name'
-  | 'roles'
-  | 'permissions'
-  | 'nodePoolAssigned'
-  | 'nodePool'
-  | 'cpu'
-  | 'storages'
-  | 'interfaces'
-  | 'powerOnDevice'
-> & {
-  roles: NodeRoleEnum[];
-  permissions?: NodePermissionEnum[];
-  cpu: CreateCpuInput;
-  storages: CreateStorageInput[];
-  interfaces: CreateInterfaceInput[];
-  powerOnDevice:
-};
+@ArgsType()
+export class FindManyPowerOnDevices
+  extends PaginationArgs
+  implements FindManyArgs<Prisma.PowerOnDeviceFindManyArgs>
+{
+  @Field(() => WherePowerOnDeviceInput, {
+    nullable: true,
+    description: 'Filter options'
+  })
+  where?: WhereUserInput;
+
+  @Field(() => OrderByUserInput, {
+    nullable: true,
+    description: 'Order options'
+  })
+  orderBy?: OrderByUserInput;
+}

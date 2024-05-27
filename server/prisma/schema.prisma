@@ -68,6 +68,7 @@ model Node {
   memory                         BigInt
   storages                       Storage[]
   interfaces                     Interface[]
+  powerStrategy                  PowerStrategyEnum
   nodePool                       NodePool             @relation(fields: [nodePoolId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "node_pool_id")
   nodePoolId                     String               @db.Uuid
   nodePoolAssigned               Boolean              @default(false) @map("node_pool_assigned")
@@ -77,6 +78,7 @@ model Node {
   maxPowerConsumption            Int                  @map("max_power_consumption")
   createdAt                      DateTime             @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt                      DateTime             @updatedAt @map("updated_at") @db.Timestamptz()
+  powerOnDevice                  PowerOnDevice[]
 
   @@map("node")
 }
@@ -87,6 +89,15 @@ enum NodeRoleEnum {
   K8S_WORKER
 
   @@map("node_role_enum")
+}
+
+enum PowerStrategyEnum {
+  WOL
+  AO
+  SP
+  BPD
+
+  @@map("power_strategy_enum")
 }
 
 enum NodePermissionEnum {
@@ -135,15 +146,16 @@ model Storage {
 }
 
 model Interface {
-  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  node      Node          @relation(fields: [nodeId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "node_id")
-  nodeId    String        @db.Uuid
-  name      String
-  address   String
-  speed     BigInt
-  wol       WoLFlagEnum[] @default([])
-  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
+  id         String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  node       Node          @relation(fields: [nodeId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "node_id")
+  nodeId     String        @db.Uuid
+  name       String
+  address    String
+  speed      BigInt
+  wol        WoLFlagEnum[] @default([])
+  controller Boolean
+  createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt  DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@unique([nodeId, name])
   @@unique([address])
@@ -158,8 +170,26 @@ enum WoLFlagEnum {
   p
   s
   u
+  d
 
   @@map("wol_flag_enum")
+}
+
+model PowerOnDevice {
+  id      String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  node    Node                  @relation(fields: [nodeId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "node_id")
+  nodeId  String                @db.Uuid
+  type    PowerOnDeviceTypeEnum
+  address String
+
+  @@map("power_on_device")
+}
+
+enum PowerOnDeviceTypeEnum {
+  SMART_PLUG
+  BUTTON_PRESS
+
+  @@map("power_on_device_type_enum")
 }
 
 model Cpu {

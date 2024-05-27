@@ -23,27 +23,11 @@
  */
 
 import type { Prisma } from '@prisma/client';
-import type { NodeRoleEnum, NodePermissionEnum } from '~/db';
-import type { CreateCpuInput } from './CreateCpuInput';
-import type { CreateStorageInput } from './CreateStorageInput';
-import type { CreateInterfaceInput } from './CreateInterfaceInput';
+import type { WoLFlagEnum } from '~/db';
 
-export type CreateNodeInput = Omit<
-  Prisma.NodeCreateInput,
-  | 'name'
-  | 'roles'
-  | 'permissions'
-  | 'nodePoolAssigned'
-  | 'nodePool'
-  | 'cpu'
-  | 'storages'
-  | 'interfaces'
-  | 'powerOnDevice'
+export type CreateInterfaceInput = Omit<
+  Prisma.InterfaceCreateWithoutNodeInput,
+  'wol'
 > & {
-  roles: NodeRoleEnum[];
-  permissions?: NodePermissionEnum[];
-  cpu: CreateCpuInput;
-  storages: CreateStorageInput[];
-  interfaces: CreateInterfaceInput[];
-  powerOnDevice:
+  wol?: WoLFlagEnum[];
 };

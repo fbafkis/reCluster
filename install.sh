@@ -977,6 +977,13 @@ assert_user() {
 
 # Sysbench status check method
 check_sysbench() {
+
+  # Look for an already existing compiled version of Sysbench on the system
+  if [ -f "$HOME/bin/recluster_sysbench" ]; then
+    whiptail --title "Check Sysbench" --msgbox "It seems that already exists a compiled version of sysbench installed on this system. Testing this first..." 8 78
+    SYSBENCH_PATH="$HOME/bin/recluster_sysbench"
+  fi
+
   whiptail --title "Check Sysbench" --msgbox "Checking if the Sysbench command is working properly." 8 78
 
   # Disabling the automatic error interruption for the script.
@@ -1769,7 +1776,7 @@ update_valid_interfaces() {
 # Let the user choose the interface
 select_interface() {
 
-  # Controlla se l'array è vuoto
+  # Check if the array is empty
   if [ -z "$_valid_interfaces" ] || [ "$_valid_interfaces" = "[]" ]; then
     if whiptail --title "No Valid Interfaces" --yesno "There are no valid interfaces available. Would you like to retry fetching the interface info?" 10 60; then
       read_interfaces_info
@@ -1779,13 +1786,12 @@ select_interface() {
     fi
   fi
 
-  # Estrai i dati delle interfacce dal JSON
+  # Estract dat from the JSON array
   interfaces=$(echo "$_valid_interfaces" | jq -c '.[]')
 
-  # Debug: verifica i dati delle interfacce estratte
   DEBUG "Interfaces' data: $interfaces"
 
-  # Prepara i dati per whiptail
+  # Prepare data for whiptail
   whiptail_args=""
   first_option=true
   for interface in $interfaces; do
@@ -1795,7 +1801,7 @@ select_interface() {
     wol=$(echo "$interface" | jq -r '.wol | join(", ")')
     control_interface=$(echo "$interface" | jq -r '.control_interface')
 
-    # Converti control_interface in true o false
+    # Convert control interface into "true" and "false" data
     if [ "$control_interface" -eq 1 ]; then
       control_interface="true"
     else
@@ -1812,23 +1818,18 @@ select_interface() {
     fi
   done
 
-  # Debug: verifica gli argomenti preparati per whiptail
-  echo "Argomenti per whiptail: $whiptail_args"
-
-  # Costruisci il comando per whiptail in modo sicuro
+  # Build the whiptail command for the radio list
   whiptail_command="whiptail --radiolist \"Scegli un'interfaccia di rete\" 20 100 10 $whiptail_args 3>&1 1>&2 2>&3"
 
-  # Esegui il comando whiptail e cattura l'output
   selected_interface=$(sh -c "$whiptail_command")
 
-  # Verifica se l'utente ha selezionato un'opzione
+  # Verify if the user made a choice
   if [ $? -eq 0 ]; then
     INFO "You chose interface $selected_interface."
 
-    # Aggiorna il campo control_interface a 1 per l'interfaccia selezionata
+    # Update the "control_interface" field to 1 for the selected interface into the JSON array
     _valid_interfaces=$(echo "$_valid_interfaces" | jq --arg sel "$selected_interface" 'map(if .name == $sel then .control_interface = 1 else . end)')
 
-    # Stampa il nuovo array JSON
     DEBUG "Updated valid interfaces' list: $_valid_interfaces"
   else
     if (whiptail --title "No interface chosen" --yesno "No interface was chose, and one is required to proceed with reCluster installation. Do you want to start over?" 10 60); then
