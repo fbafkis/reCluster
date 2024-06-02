@@ -29,3 +29,4 @@ export * from './OrderByNodeInput';
 export * from './OrderByNodePoolInput';
 export * from './OrderByStatusInput';
 export * from './OrderByUserInput';
+export * from './OrderByPowerOnDeviceInput';

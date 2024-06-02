@@ -25,7 +25,10 @@
 import type { Prisma } from '@prisma/client';
 import { ArgsType, Field } from 'type-graphql';
 import { FindManyArgs } from '~/types';
-import { OrderByUserInput, WherePowerOnDeviceInput } from '../../../inputs';
+import {
+  OrderByPowerOnDeviceInput,
+  WherePowerOnDeviceInput
+} from '../../../inputs';
 import { PaginationArgs } from './PaginationArgs';
 
 @ArgsType()
@@ -37,11 +40,11 @@ export class FindManyPowerOnDevices
     nullable: true,
     description: 'Filter options'
   })
-  where?: WhereUserInput;
+  where?: WherePowerOnDeviceInput;
 
-  @Field(() => OrderByUserInput, {
+  @Field(() => OrderByPowerOnDeviceInput, {
     nullable: true,
     description: 'Order options'
   })
-  orderBy?: OrderByUserInput;
+  orderBy?: OrderByPowerOnDeviceInput;
 }

@@ -22,6 +22,29 @@
  * SOFTWARE.
  */
 
-export * from './CreateNodeArgs';
-export * from './CreateUserArgs';
-export * from './CreatePowerOnDeviceArgs';
+import type * as Prisma from '@prisma/client';
+import { GraphQLID, GraphQLString, GraphQLBoolean } from 'graphql';
+import { Field, ObjectType } from 'type-graphql';
+import { GraphQLTimestamp, GraphQLIP } from 'graphql-scalars';
+import { PowerOnDeviceTypeEnum } from '~/db';
+// eslint-disable-next-line import/no-cycle
+import { Node } from './Node';
+
+@ObjectType({ description: 'Power on interface' })
+export class PowerOnDevice implements Prisma.PowerOnDevice {
+  @Field(() => GraphQLID, { description: 'Power on device identifier' })
+  id!: string;
+
+  nodeId!: string;
+
+  @Field(() => PowerOnDeviceTypeEnum, { description: 'Power on device type' })
+  deviceType!: PowerOnDeviceTypeEnum;
+
+  @Field(() => GraphQLIP, { description: 'Power on device IP address' })
+  address!: string;
+
+  /* Field resolvers */
+
+  @Field(() => Node, { description: 'Interface node' })
+  node!: Node;
+}

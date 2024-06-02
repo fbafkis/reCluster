@@ -22,6 +22,20 @@
  * SOFTWARE.
  */
 
-export * from './CreateNodeArgs';
-export * from './CreateUserArgs';
-export * from './CreatePowerOnDeviceArgs';
+import type { Prisma } from '@prisma/client';
+import { GraphQLBoolean } from 'graphql';
+import { ArgsType, Field } from 'type-graphql';
+import { ValidateNested } from 'class-validator';
+import { UpdateInterfaceInput } from '../../inputs';
+
+type IUpdateInterfaceArgs = Required<Pick<Prisma.InterfaceUpdateArgs, 'data'>>;
+
+@ArgsType()
+export class UpdateInterfaceArgs implements IUpdateInterfaceArgs {
+  @Field(() => GraphQLBoolean, { description: 'Controller flag' })
+  controller!: boolean;
+
+  @Field({ description: 'Interface data' })
+  @ValidateNested()
+  data!: UpdateInterfaceInput;
+}

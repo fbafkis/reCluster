@@ -29,3 +29,4 @@ export * from './FindUniqueNodeArgs';
 export * from './FindUniqueNodePoolArgs';
 export * from './FindUniqueStatusArgs';
 export * from './FindUniqueUserArgs';
+export * from './FindUniquePowerOnDeviceArgs';

@@ -23,11 +23,40 @@
  */
 
 import type { Prisma } from '@prisma/client';
-import type { WoLFlagEnum } from '~/db';
+import { Field, InputType } from 'type-graphql';
+import { SortOrderEnum } from '../../enums';
 
-export type CreatePowerOnDeviceInput = Omit<
-  Prisma.PowerOnDeviceCreateWithoutNodeInput,
-  'wol'
-> & {
-  wol?: WoLFlagEnum[];
-};
+@InputType({ isAbstract: true, description: 'Interface order by input' })
+export class OrderByPowerOnDeviceInput
+  implements Partial<Omit<Prisma.InterfaceOrderByWithRelationInput, 'node'>>
+{
+  @Field(() => SortOrderEnum, { description: 'Interface identifier' })
+  id?: SortOrderEnum;
+
+  @Field(() => SortOrderEnum, { description: 'Node identifier' })
+  nodeId?: SortOrderEnum;
+
+  @Field(() => SortOrderEnum, { description: 'Interface name' })
+  name?: SortOrderEnum;
+
+  @Field(() => SortOrderEnum, { description: 'Interface MAC address' })
+  address?: SortOrderEnum;
+
+  @Field(() => SortOrderEnum, { description: 'Interface speed' })
+  speed?: SortOrderEnum;
+
+  @Field(() => SortOrderEnum, { description: 'Interface Wake-on-Lan flags' })
+  wol?: SortOrderEnum;
+
+  @Field(() => SortOrderEnum, {
+    nullable: true,
+    description: 'Creation timestamp'
+  })
+  createdAt?: SortOrderEnum;
+
+  @Field(() => SortOrderEnum, {
+    nullable: true,
+    description: 'Update timestamp'
+  })
+  updatedAt?: SortOrderEnum;
+}

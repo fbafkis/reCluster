@@ -27,3 +27,4 @@ export * from './CreateInterfaceInput';
 export * from './CreateNodeInput';
 export * from './CreateStorageInput';
 export * from './CreateUserInput';
+export * from './CreatePowerOnDeviceInput';

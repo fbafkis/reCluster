@@ -26,12 +26,7 @@ import type * as Prisma from '@prisma/client';
 import { GraphQLBoolean, GraphQLID, GraphQLInt, GraphQLString } from 'graphql';
 import { Field, ObjectType } from 'type-graphql';
 import { GraphQLBigInt, GraphQLIP, GraphQLTimestamp } from 'graphql-scalars';
-import {
-  NodeRoleEnum,
-  NodePermissionEnum,
-  PowerStrategyEnum,
-  PowerOnDevice
-} from '~/db';
+import { NodeRoleEnum, NodePermissionEnum, PowerStrategyEnum } from '~/db';
 // eslint-disable-next-line import/no-cycle
 import { Cpu } from './Cpu';
 // eslint-disable-next-line import/no-cycle
@@ -42,6 +37,8 @@ import { NodePool } from './NodePool';
 import { Status } from './Status';
 // eslint-disable-next-line import/no-cycle
 import { Storage } from './Storage';
+// eslint-disable-next-line import/no-cycle
+import { PowerOnDevice } from './PowerOnDevice';
 
 @ObjectType({ description: 'Node' })
 export class Node implements Prisma.Node {
@@ -88,7 +85,7 @@ export class Node implements Prisma.Node {
   @Field(() => PowerStrategyEnum, { description: 'Power strategy' })
   powerStrategy!: PowerStrategyEnum;
 
-  @Field(() => PowerOnDevice, { description: 'Power strategy' })
+  @Field(() => PowerOnDevice, { description: 'Power on device' })
   powerOnDevice!: PowerOnDevice;
 
   @Field(() => GraphQLTimestamp, { description: 'Creation timestamp' })

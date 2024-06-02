@@ -22,6 +22,16 @@
  * SOFTWARE.
  */
 
-export * from './CreateNodeArgs';
-export * from './CreateUserArgs';
-export * from './CreatePowerOnDeviceArgs';
+import { GraphQLBoolean } from 'graphql';
+import { Field, InputType } from 'type-graphql';
+import { GraphQLNonEmptyString, GraphQLNonNegativeInt } from 'graphql-scalars';
+import type { UpdateInterfaceInput as IUpdateInterfaceInput } from '~/types';
+
+@InputType({ description: 'Update Node pool input' })
+export class UpdateInterfaceInput implements IUpdateInterfaceInput {
+  @Field(() => GraphQLBoolean, {
+    nullable: true,
+    description: 'Interface controller flag'
+  })
+  controller?: boolean;
+}

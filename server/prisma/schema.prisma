@@ -176,11 +176,11 @@ enum WoLFlagEnum {
 }
 
 model PowerOnDevice {
-  id      String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  node    Node                  @relation(fields: [nodeId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "node_id")
-  nodeId  String                @db.Uuid
-  type    PowerOnDeviceTypeEnum
-  address String
+  id         String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  node       Node                  @relation(fields: [nodeId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "node_id")
+  nodeId     String                @db.Uuid
+  deviceType PowerOnDeviceTypeEnum
+  address    String
 
   @@map("power_on_device")
 }

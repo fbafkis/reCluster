@@ -29,3 +29,4 @@ export * from './WhereNodeInput';
 export * from './WhereNodePoolInput';
 export * from './WhereStatusInput';
 export * from './WhereUserInput';
+export * from './WherePowerOnDeviceInput';

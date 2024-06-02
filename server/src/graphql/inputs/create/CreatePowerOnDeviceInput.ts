@@ -30,11 +30,11 @@ import {
 } from 'graphql-scalars';
 import { Field, InputType } from 'type-graphql';
 import { ArrayNotContains, ArrayUnique } from 'class-validator';
-import type { CreateInterfaceInput as ICreateInterfaceInput } from '~/types';
+import type { CreatePowerOnInput as ICreatePowerOnInput } from '~/types';
 import { WoLFlagEnum } from '~/db';
 
 @InputType({ description: 'Create Interface input' })
-export class CreateInterfaceInput implements ICreateInterfaceInput {
+export class CreatePowerOnDeviceInput implements ICreatePowerOnDeviceInput {
   @Field(() => GraphQLNonEmptyString, { description: 'Interface name' })
   name!: string;
 

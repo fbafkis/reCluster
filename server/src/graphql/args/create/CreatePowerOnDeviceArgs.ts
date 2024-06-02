@@ -22,6 +22,16 @@
  * SOFTWARE.
  */
 
-export * from './CreateNodeArgs';
-export * from './CreateUserArgs';
-export * from './CreatePowerOnDeviceArgs';
+import { ArgsType, Field } from 'type-graphql';
+import { ValidateNested } from 'class-validator';
+import type { CreateArgs } from '~/types';
+import { CreatePowerOnDeviceInput } from '../../inputs';
+
+@ArgsType()
+export class CreatePowerOnDeviceArgs
+  implements CreateArgs<CreatePowerOnDeviceInput>
+{
+  @Field({ description: 'Power on device data' })
+  @ValidateNested()
+  data!: CreatePowerOnDeviceInput;
+}

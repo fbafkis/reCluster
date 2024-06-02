@@ -22,6 +22,34 @@
  * SOFTWARE.
  */
 
-export * from './CreateNodeArgs';
-export * from './CreateUserArgs';
-export * from './CreatePowerOnDeviceArgs';
+import { GraphQLBoolean } from 'graphql';
+import { Field, InputType } from 'type-graphql';
+import { GraphQLNonEmptyString, GraphQLNonNegativeInt } from 'graphql-scalars';
+import type { UpdateNodeInput as IUpdateNodeInput } from '~/types';
+
+@InputType({ description: 'Update Node pool input' })
+export class UpdateNodeInput implements IUpdateNodeInput {
+  @Field(() => GraphQLNonEmptyString, {
+    nullable: true,
+    description: 'Node pool name'
+  })
+  name?: string;
+
+  @Field(() => GraphQLBoolean, {
+    nullable: true,
+    description: 'Node pool auto scale flag'
+  })
+  autoScale?: boolean;
+
+  @Field(() => GraphQLNonNegativeInt, {
+    nullable: true,
+    description: 'Node pool node count'
+  })
+  count?: number;
+
+  @Field(() => GraphQLNonNegativeInt, {
+    nullable: true,
+    description: 'Node pool minimum number of nodes'
+  })
+  minNodes?: number;
+}

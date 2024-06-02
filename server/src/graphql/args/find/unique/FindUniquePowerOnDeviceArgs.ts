@@ -22,6 +22,30 @@
  * SOFTWARE.
  */
 
-export * from './CreateNodeArgs';
-export * from './CreateUserArgs';
-export * from './CreatePowerOnDeviceArgs';
+import type { Prisma } from '@prisma/client';
+import { GraphQLID } from 'graphql';
+import { GraphQLIP } from 'graphql-scalars';
+import { ArgsType, Field } from 'type-graphql';
+
+@ArgsType()
+export class FindUniquePowerOnDeviceArgs
+  implements Prisma.PowerOnDeviceWhereUniqueInput
+{
+  @Field(() => GraphQLID, {
+    nullable: true,
+    description: 'Power on device identifier'
+  })
+  id?: string;
+
+  @Field(() => GraphQLID, {
+    nullable: true,
+    description: 'Power on device node'
+  })
+  node?: string;
+
+  @Field(() => GraphQLIP, {
+    nullable: true,
+    description: 'Power on device IP address'
+  })
+  address?: string;
+}

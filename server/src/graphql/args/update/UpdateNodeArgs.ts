@@ -22,6 +22,24 @@
  * SOFTWARE.
  */
 
-export * from './CreateNodeArgs';
-export * from './CreateUserArgs';
-export * from './CreatePowerOnDeviceArgs';
+import type { Prisma } from '@prisma/client';
+import { GraphQLID } from 'graphql';
+import { ArgsType, Field } from 'type-graphql';
+import { ValidateNested } from 'class-validator';
+import { PowerOnDevice } from '~/graphql/entities/PowerOnDevice';
+import { UpdateNodeInput } from '../../inputs';
+
+type IUpdateNodeArgs = Required<Pick<Prisma.NodeUpdateArgs, 'data'>>;
+
+@ArgsType()
+export class UpdateNodeArgs implements IUpdateNodeArgs {
+  @Field(() => GraphQLID, { description: 'Node pool identifier' })
+  id!: string;
+
+  @Field(() => PowerOnDevice, { description: 'Power device identifier' })
+  powerOnDevice!: PowerOnDevice;
+
+  @Field({ description: 'Node pool data' })
+  @ValidateNested()
+  data!: UpdateNodeInput;
+}

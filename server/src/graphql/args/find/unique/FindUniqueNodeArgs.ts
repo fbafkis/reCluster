@@ -32,6 +32,12 @@ export class FindUniqueNodeArgs implements Prisma.NodeWhereUniqueInput {
   @Field(() => GraphQLID, { nullable: true, description: 'Node identifier' })
   id?: string;
 
+  @Field(() => GraphQLID, {
+    nullable: true,
+    description: 'Power on device identifier'
+  })
+  powerOnDevice?: string;
+
   @Field(() => GraphQLString, { nullable: true, description: 'Node name' })
   name?: string;
 

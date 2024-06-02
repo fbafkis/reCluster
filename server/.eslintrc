@@ -47,7 +47,12 @@
     "plugin:prettier/recommended"
   ],
   "rules": {
-    "prettier/prettier": "error",
+    "prettier/prettier": [
+      "error",
+      {
+        "endOfLine": "auto"
+      }
+    ],
     "tsdoc/syntax": "warn",
     "license-header/header": ["error", "license.js"],
     "import/no-default-export": "error",

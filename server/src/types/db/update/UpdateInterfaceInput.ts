@@ -22,6 +22,13 @@
  * SOFTWARE.
  */
 
-export * from './CreateNodeArgs';
-export * from './CreateUserArgs';
-export * from './CreatePowerOnDeviceArgs';
+import type { Prisma } from '@prisma/client';
+import type { UpdateInput } from '../../helpers';
+import type { UpdateStatusInput } from './UpdateStatusInput';
+
+export type UpdateInterfaceInput = Omit<
+  UpdateInput<Prisma.InterfaceUpdateInput>,
+  'status'
+> & {
+  status?: UpdateStatusInput;
+};

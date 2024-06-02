@@ -25,3 +25,4 @@
 export * from './UpdateNodePoolArgs';
 export * from './UpdateStatusArgs';
 export * from './UpdateUserArgs';
+export * from './UpdateNodeArgs';

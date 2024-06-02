@@ -23,11 +23,41 @@
  */
 
 import type { Prisma } from '@prisma/client';
-import type { WoLFlagEnum } from '~/db';
+import { Field, InputType } from 'type-graphql';
+import {
+  BigIntFilter,
+  StringFilter,
+  WoLFlagEnumListFilter,
+  TimestampFilter,
+  UuidFilter
+} from '../filters';
 
-export type CreatePowerOnDeviceInput = Omit<
-  Prisma.PowerOnDeviceCreateWithoutNodeInput,
-  'wol'
-> & {
-  wol?: WoLFlagEnum[];
-};
+@InputType({ isAbstract: true, description: 'Interface where input' })
+export class WherePowerOnDeviceInput
+  implements
+    Partial<Omit<Prisma.InterfaceWhereInput, 'AND' | 'OR' | 'NOT' | 'node'>>
+{
+  @Field({ nullable: true, description: 'Interface identifier' })
+  id?: UuidFilter;
+
+  @Field({ nullable: true, description: 'Node identifier' })
+  nodeId?: StringFilter;
+
+  @Field({ nullable: true, description: 'Interface name' })
+  name?: StringFilter;
+
+  @Field({ nullable: true, description: 'Interface MAC address' })
+  address?: StringFilter;
+
+  @Field({ nullable: true, description: 'Interface speed' })
+  speed?: BigIntFilter;
+
+  @Field({ nullable: true, description: 'Interface Wake-on-Lan flags' })
+  wol?: WoLFlagEnumListFilter;
+
+  @Field({ nullable: true, description: 'Creation timestamp' })
+  createdAt?: TimestampFilter;
+
+  @Field({ nullable: true, description: 'Update timestamp' })
+  updatedAt?: TimestampFilter;
+}
