@@ -40,3 +40,4 @@ export * from './TimestampNullableFilter';
 export * from './UserPermissionEnumListFilter';
 export * from './UserRoleEnumListFilter';
 export * from './UuidFilter';
+export * from './PowerOnDeviceTypeEnumListFilter';

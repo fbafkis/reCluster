@@ -25,10 +25,10 @@
 import {
   GraphQLBigInt,
   GraphQLMAC,
-  GraphQLNonEmptyString,
-  GraphQLBoolean
+  GraphQLNonEmptyString
 } from 'graphql-scalars';
 import { Field, InputType } from 'type-graphql';
+import { GraphQLBoolean } from 'graphql';
 import { ArrayNotContains, ArrayUnique } from 'class-validator';
 import type { CreateInterfaceInput as ICreateInterfaceInput } from '~/types';
 import { WoLFlagEnum } from '~/db';
@@ -48,9 +48,9 @@ export class CreateInterfaceInput implements ICreateInterfaceInput {
     nullable: true,
     description: 'Interface Wake-on-Lan flags'
   })
-  @Field(() => GraphQLBoolean, { description: 'Controller interface flag' })
-  control!: boolean;
-
   @ArrayUnique()
   wol?: WoLFlagEnum[];
+
+  @Field(() => GraphQLBoolean, { description: 'Controller interface flag' })
+  controller!: boolean;
 }

@@ -139,9 +139,9 @@ registerEnumType(PowerStrategyEnum, {
   name: 'PowerStrategyEnum',
   description: 'Power strategy',
   valuesConfig: {
-    WOL: { description: 'Node powered on through WoL' }
-  },
-  AO: { description: 'Node is alway on' },
-  SP: { description: 'Node gets powered on through smart plug' },
-  BPD: { description: 'Node gets powered on through button press device' }
+    WOL: { description: 'Node powered on through WoL' },
+    AO: { description: 'Node is alway on' },
+    SP: { description: 'Node gets powered on through smart plug' },
+    BPD: { description: 'Node gets powered on through button press device' }
+  }
 });

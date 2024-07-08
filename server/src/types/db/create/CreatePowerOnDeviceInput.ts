@@ -23,11 +23,5 @@
  */
 
 import type { Prisma } from '@prisma/client';
-import type { WoLFlagEnum } from '~/db';
 
-export type CreatePowerOnDeviceInput = Omit<
-  Prisma.PowerOnDeviceCreateWithoutNodeInput,
-  'wol'
-> & {
-  wol?: WoLFlagEnum[];
-};
+export type CreatePowerOnDeviceInput = {};

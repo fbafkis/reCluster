@@ -22,11 +22,12 @@
  * SOFTWARE.
  */
 
-import type { Prisma } from '@prisma/client';
-import type { NodeRoleEnum, NodePermissionEnum } from '~/db';
+import { PowerOnDevice, type Prisma } from '@prisma/client';
+import type { NodeRoleEnum, NodePermissionEnum, PowerStrategyEnum } from '~/db';
 import type { CreateCpuInput } from './CreateCpuInput';
 import type { CreateStorageInput } from './CreateStorageInput';
 import type { CreateInterfaceInput } from './CreateInterfaceInput';
+import { CreatePowerOnDeviceInput } from './CreatePowerOnDeviceInput';
 
 export type CreateNodeInput = Omit<
   Prisma.NodeCreateInput,
@@ -45,5 +46,5 @@ export type CreateNodeInput = Omit<
   cpu: CreateCpuInput;
   storages: CreateStorageInput[];
   interfaces: CreateInterfaceInput[];
-  powerOnDevice:
+  powerOnDevice?: CreatePowerOnDeviceInput;
 };

@@ -29,3 +29,4 @@ export * from './Node';
 export * from './NodePool';
 export * from './Status';
 export * from './User';
+export * from './PowerOnDevice';

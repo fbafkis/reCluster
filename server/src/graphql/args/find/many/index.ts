@@ -29,4 +29,5 @@ export * from './FindManyNodeArgs';
 export * from './FindManyNodePoolArgs';
 export * from './FindManyStatusArgs';
 export * from './FindManyPowerOnDevices';
+export * from './FindManyUserArgs';
 export * from './PaginationArgs';

@@ -32,7 +32,7 @@ import {
   ValidateNested
 } from 'class-validator';
 import type { CreateNodeInput as ICreateNodeInput } from '~/types';
-import { NodeRoleEnum, NodePermissionEnum } from '~/db';
+import { NodeRoleEnum, NodePermissionEnum, PowerStrategyEnum } from '~/db';
 import { CreateCpuInput } from './CreateCpuInput';
 import { CreateStorageInput } from './CreateStorageInput';
 import { CreateInterfaceInput } from './CreateInterfaceInput';
@@ -88,6 +88,9 @@ export class CreateNodeInput
   @Field(() => [CreateStorageInput], { description: 'Node storages' })
   @ValidateNested({ each: true })
   storages!: CreateStorageInput[];
+
+  @Field(() => PowerStrategyEnum, { description: 'Node power strategy' })
+  powerStrategy!: PowerStrategyEnum;
 
   @Field(() => [CreateInterfaceInput], { description: 'Node interfaces' })
   @ValidateNested({ each: true })

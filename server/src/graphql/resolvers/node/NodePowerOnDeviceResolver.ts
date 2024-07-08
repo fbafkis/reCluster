@@ -22,13 +22,28 @@
  * SOFTWARE.
  */
 
-import type { Prisma } from '@prisma/client';
-import type { WoLFlagEnum } from '~/db';
+import { Args, FieldResolver, Resolver, Root } from 'type-graphql';
+import { inject, injectable } from 'tsyringe';
+import { PowerOnDeviceService } from '~/services';
+import { FindManyInterfaceArgs } from '../../args';
+import { Node, Interface, PowerOnDevice } from '../../entities';
 
-export type CreateInterfaceInput = {
-  wol?: WoLFlagEnum[];
-  name: string;
-  address: string;
-  speed: bigint;
-  controller: boolean;
-};
+@Resolver(Node)
+@injectable()
+export class NodePowerOnDeviceResolver {
+  public constructor(
+    @inject(PowerOnDeviceService)
+    private readonly powerOnDeviceService: PowerOnDeviceService
+  ) {}
+
+  @FieldResolver(() => [PowerOnDevice])
+  public powerOnDevices(
+    @Root() node: Node,
+    @Args() args: FindManyInterfaceArgs
+  ) {
+    return this.powerOnDeviceService.findMany({
+      ...args,
+      where: { ...args.where, nodeId: node.id }
+    });
+  }
+}

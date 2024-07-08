@@ -24,7 +24,6 @@
 
 import { GraphQLBoolean } from 'graphql';
 import { Field, InputType } from 'type-graphql';
-import { GraphQLNonEmptyString, GraphQLNonNegativeInt } from 'graphql-scalars';
 import type { UpdateInterfaceInput as IUpdateInterfaceInput } from '~/types';
 
 @InputType({ description: 'Update Node pool input' })

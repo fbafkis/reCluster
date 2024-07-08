@@ -1147,7 +1147,7 @@ add_package() {
       DEBUG "The package $package_name has been succesflly installed."
     else
       FATAL "Error while installing the package $package_name. Exiting ..."
-
+      whiptail --title "Error while installing the package $package_name. Exiting ..." 10 78
     fi
   fi
 }

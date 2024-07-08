@@ -32,7 +32,12 @@ export class OrderByNodeInput
     Partial<
       Omit<
         Prisma.NodeOrderByWithRelationInput,
-        'nodePool' | 'statuses' | 'cpu' | 'storages' | 'interfaces'
+        | 'nodePool'
+        | 'statuses'
+        | 'cpu'
+        | 'storages'
+        | 'interfaces'
+        | 'powerOnDevice'
       >
     >
 {
@@ -102,6 +107,10 @@ export class OrderByNodeInput
   })
   maxPowerConsumption?: SortOrderEnum;
 
+  @Field(() => SortOrderEnum, {
+    nullable: true,
+    description: 'Power on device'
+  })
   @Field(() => SortOrderEnum, {
     nullable: true,
     description: 'Creation timestamp'

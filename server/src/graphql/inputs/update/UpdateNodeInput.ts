@@ -26,30 +26,14 @@ import { GraphQLBoolean } from 'graphql';
 import { Field, InputType } from 'type-graphql';
 import { GraphQLNonEmptyString, GraphQLNonNegativeInt } from 'graphql-scalars';
 import type { UpdateNodeInput as IUpdateNodeInput } from '~/types';
+import { PowerOnDevice } from '~/graphql/entities';
+import { Prisma } from '@prisma/client';
 
 @InputType({ description: 'Update Node pool input' })
 export class UpdateNodeInput implements IUpdateNodeInput {
-  @Field(() => GraphQLNonEmptyString, {
+  @Field(() => PowerOnDevice, {
     nullable: true,
-    description: 'Node pool name'
+    description: 'Node power on device'
   })
-  name?: string;
-
-  @Field(() => GraphQLBoolean, {
-    nullable: true,
-    description: 'Node pool auto scale flag'
-  })
-  autoScale?: boolean;
-
-  @Field(() => GraphQLNonNegativeInt, {
-    nullable: true,
-    description: 'Node pool node count'
-  })
-  count?: number;
-
-  @Field(() => GraphQLNonNegativeInt, {
-    nullable: true,
-    description: 'Node pool minimum number of nodes'
-  })
-  minNodes?: number;
+  powerOnDevice?: Prisma.PowerOnDeviceUpdateOneWithoutNodeNestedInput;
 }

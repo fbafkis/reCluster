@@ -24,33 +24,26 @@
 
 import {
   GraphQLBigInt,
-  GraphQLMAC,
-  GraphQLNonEmptyString,
-  GraphQLBoolean
+  GraphQLIP,
+  GraphQLNonEmptyString
 } from 'graphql-scalars';
+import { GraphQLBoolean } from 'graphql';
 import { Field, InputType } from 'type-graphql';
 import { ArrayNotContains, ArrayUnique } from 'class-validator';
-import type { CreatePowerOnInput as ICreatePowerOnInput } from '~/types';
-import { WoLFlagEnum } from '~/db';
+import type { CreatePowerOnDeviceInput as ICreatePowerOnDeviceInput } from '~/types';
+import { PowerOnDeviceTypeEnum, WoLFlagEnum } from '~/db';
 
 @InputType({ description: 'Create Interface input' })
 export class CreatePowerOnDeviceInput implements ICreatePowerOnDeviceInput {
-  @Field(() => GraphQLNonEmptyString, { description: 'Interface name' })
-  name!: string;
-
-  @Field(() => GraphQLMAC, { description: 'Interface MAC address' })
+  @Field(() => GraphQLIP, { description: 'Power on device IP address' })
   address!: string;
 
   @Field(() => GraphQLBigInt, { description: 'Interface speed' })
   speed!: bigint;
 
-  @Field(() => [WoLFlagEnum], {
-    nullable: true,
-    description: 'Interface Wake-on-Lan flags'
+  @Field(() => [PowerOnDeviceTypeEnum], {
+    description: 'Power on device type'
   })
-  @Field(() => GraphQLBoolean, { description: 'Controller interface flag' })
-  control!: boolean;
-
   @ArrayUnique()
-  wol?: WoLFlagEnum[];
+  deviceType?: PowerOnDeviceTypeEnum;
 }

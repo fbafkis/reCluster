@@ -31,29 +31,26 @@ import {
   TimestampFilter,
   UuidFilter
 } from '../filters';
+import { PowerOnDeviceTypeEnumFilter } from '../filters/PowerOnDeviceTypeEnumListFilter';
 
 @InputType({ isAbstract: true, description: 'Interface where input' })
 export class WherePowerOnDeviceInput
   implements
-    Partial<Omit<Prisma.InterfaceWhereInput, 'AND' | 'OR' | 'NOT' | 'node'>>
+    Partial<
+      Omit<Prisma.PowerOnDeviceWhereInput, 'AND' | 'OR' | 'NOT' | 'node'>
+    >
 {
-  @Field({ nullable: true, description: 'Interface identifier' })
+  @Field({ nullable: true, description: 'Power on device identifier' })
   id?: UuidFilter;
 
   @Field({ nullable: true, description: 'Node identifier' })
   nodeId?: StringFilter;
 
-  @Field({ nullable: true, description: 'Interface name' })
-  name?: StringFilter;
+  @Field({ nullable: true, description: 'Power on device type' })
+  deviceType?: PowerOnDeviceTypeEnumFilter;
 
-  @Field({ nullable: true, description: 'Interface MAC address' })
+  @Field({ nullable: true, description: 'Power on device IP address' })
   address?: StringFilter;
-
-  @Field({ nullable: true, description: 'Interface speed' })
-  speed?: BigIntFilter;
-
-  @Field({ nullable: true, description: 'Interface Wake-on-Lan flags' })
-  wol?: WoLFlagEnumListFilter;
 
   @Field({ nullable: true, description: 'Creation timestamp' })
   createdAt?: TimestampFilter;

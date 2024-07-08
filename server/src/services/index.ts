@@ -33,3 +33,4 @@ export * from './StatusService';
 export * from './TokenService';
 export * from './UserService';
 export * from './WoLService';
+export * from './PowerOnDeviceService';

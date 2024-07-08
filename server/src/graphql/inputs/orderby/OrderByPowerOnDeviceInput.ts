@@ -26,27 +26,22 @@ import type { Prisma } from '@prisma/client';
 import { Field, InputType } from 'type-graphql';
 import { SortOrderEnum } from '../../enums';
 
-@InputType({ isAbstract: true, description: 'Interface order by input' })
+@InputType({ isAbstract: true, description: 'Power on device order by input' })
 export class OrderByPowerOnDeviceInput
-  implements Partial<Omit<Prisma.InterfaceOrderByWithRelationInput, 'node'>>
+  implements
+    Partial<Omit<Prisma.PowerOnDeviceOrderByWithRelationInput, 'node'>>
 {
-  @Field(() => SortOrderEnum, { description: 'Interface identifier' })
+  @Field(() => SortOrderEnum, { description: 'Power On Device identifier' })
   id?: SortOrderEnum;
 
   @Field(() => SortOrderEnum, { description: 'Node identifier' })
   nodeId?: SortOrderEnum;
 
-  @Field(() => SortOrderEnum, { description: 'Interface name' })
-  name?: SortOrderEnum;
+  @Field(() => SortOrderEnum, { description: 'Power On deviece type' })
+  deviceType?: SortOrderEnum;
 
-  @Field(() => SortOrderEnum, { description: 'Interface MAC address' })
+  @Field(() => SortOrderEnum, { description: 'Power On device IP address' })
   address?: SortOrderEnum;
-
-  @Field(() => SortOrderEnum, { description: 'Interface speed' })
-  speed?: SortOrderEnum;
-
-  @Field(() => SortOrderEnum, { description: 'Interface Wake-on-Lan flags' })
-  wol?: SortOrderEnum;
 
   @Field(() => SortOrderEnum, {
     nullable: true,
