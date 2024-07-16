@@ -1755,17 +1755,17 @@ update_valid_interfaces() {
     --arg address "$_address" \
     '
       if length == 0 then
-        [{"name": $iname, "speed": ($speed | tonumber), "wol": ($wol | split("")), "address": $address, "control_interface": 0}]
+        [{"name": $iname, "speed": ($speed | tonumber), "wol": ($wol | split("")), "address": $address, "controller": false}]
       else
         map(if .name == $iname then
-          . + {"speed": ($speed | tonumber), "wol": ($wol | split("")), "address": $address, "control_interface": 0}
+          . + {"speed": ($speed | tonumber), "wol": ($wol | split("")), "address": $address, "controller": false}
         else
           .
         end)
         | if any(.name == $iname) then
             .
           else
-            . + [{"name": $iname, "speed": ($speed | tonumber), "wol": ($wol | split("")), "address": $address, "control_interface": 0}]
+            . + [{"name": $iname, "speed": ($speed | tonumber), "wol": ($wol | split("")), "address": $address, "controller": false}]
           end
       end
     ')
@@ -1799,16 +1799,16 @@ select_interface() {
     address=$(echo "$interface" | jq -r '.address')
     speed=$(echo "$interface" | jq -r '.speed')
     wol=$(echo "$interface" | jq -r '.wol | join(", ")')
-    control_interface=$(echo "$interface" | jq -r '.control_interface')
+    controller_interface=$(echo "$interface" | jq -r '.controller')
 
     # Convert control interface into "true" and "false" data
-    if [ "$control_interface" -eq 1 ]; then
-      control_interface="true"
+    if [ "$controller_interface" -eq 1 ]; then
+      controller_interface="true"
     else
-      control_interface="false"
+      controller_interface="false"
     fi
 
-    description="Address: $address, Speed: $speed, WOL: $wol, Controller: $control_interface"
+    description="Address: $address, Speed: $speed, WOL: $wol, Controller: $controller_interface"
 
     if [ "$first_option" = true ]; then
       whiptail_args="$whiptail_args \"$name\" \"$description\" ON"
@@ -1827,8 +1827,8 @@ select_interface() {
   if [ $? -eq 0 ]; then
     INFO "You chose interface $selected_interface."
 
-    # Update the "control_interface" field to 1 for the selected interface into the JSON array
-    _valid_interfaces=$(echo "$_valid_interfaces" | jq --arg sel "$selected_interface" 'map(if .name == $sel then .control_interface = 1 else . end)')
+    # Update the "controller" field to "true" for the selected interface into the JSON array
+    _valid_interfaces=$(echo "$_valid_interfaces" | jq --arg sel "$selected_interface" 'map(if .name == $sel then .controller = true else . end)')
 
     DEBUG "Updated valid interfaces' list: $_valid_interfaces"
   else
@@ -2923,6 +2923,16 @@ read_power_consumptions() {
         '
   )
 }
+
+# Boot strategy
+
+NODE_FACTS=$(
+  printf '%s\n' "$NODE_FACTS" |
+    jq \
+      '
+        .powerOnStrategy = "WOL"
+      '
+)
 
 # Finalize node facts
 finalize_node_facts() {

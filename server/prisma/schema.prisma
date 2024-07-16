@@ -68,7 +68,7 @@ model Node {
   memory                         BigInt
   storages                       Storage[]
   interfaces                     Interface[]
-  powerStrategy                  PowerStrategyEnum
+  powerOnStrategy                PowerOnStrategyEnum
   nodePool                       NodePool             @relation(fields: [nodePoolId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "node_pool_id")
   nodePoolId                     String               @db.Uuid
   nodePoolAssigned               Boolean              @default(false) @map("node_pool_assigned")
@@ -91,7 +91,7 @@ enum NodeRoleEnum {
   @@map("node_role_enum")
 }
 
-enum PowerStrategyEnum {
+enum PowerOnStrategyEnum {
   WOL
   AO
   SP

@@ -35,6 +35,7 @@ export class PowerOnDevice implements Prisma.PowerOnDevice {
   @Field(() => GraphQLID, { description: 'Power on device identifier' })
   id!: string;
 
+  @Field(() => String, { description: 'Node identifier' }) // Add Field decorator here
   nodeId!: string;
 
   @Field(() => PowerOnDeviceTypeEnum, { description: 'Power on device type' })
@@ -42,8 +43,6 @@ export class PowerOnDevice implements Prisma.PowerOnDevice {
 
   @Field(() => GraphQLIP, { description: 'Power on device IP address' })
   address!: string;
-
-  /* Field resolvers */
 
   @Field(() => Node, { description: 'Interface node' })
   node!: Node;

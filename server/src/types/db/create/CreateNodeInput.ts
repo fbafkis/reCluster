@@ -22,8 +22,8 @@
  * SOFTWARE.
  */
 
-import { PowerOnDevice, type Prisma } from '@prisma/client';
-import type { NodeRoleEnum, NodePermissionEnum, PowerStrategyEnum } from '~/db';
+import { type Prisma } from '@prisma/client';
+import type { NodeRoleEnum, NodePermissionEnum } from '~/db';
 import type { CreateCpuInput } from './CreateCpuInput';
 import type { CreateStorageInput } from './CreateStorageInput';
 import type { CreateInterfaceInput } from './CreateInterfaceInput';

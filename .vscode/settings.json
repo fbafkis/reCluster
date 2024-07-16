@@ -8,5 +8,6 @@
   "files.associations": {
     "ssh_config": "ssh_config",
     "sshd_config": "ssh_config"
-  }
+  },
+  "typescript.tsdk": "node_modules\\typescript\\lib"
 }

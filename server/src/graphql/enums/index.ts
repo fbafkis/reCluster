@@ -32,7 +32,7 @@ import {
   NodeStatusEnum,
   UserRoleEnum,
   UserPermissionEnum,
-  PowerStrategyEnum,
+  PowerOnStrategyEnum,
   PowerOnDeviceTypeEnum
 } from '~/db';
 
@@ -135,13 +135,22 @@ registerEnumType(UserPermissionEnum, {
   valuesConfig: {}
 });
 
-registerEnumType(PowerStrategyEnum, {
-  name: 'PowerStrategyEnum',
-  description: 'Power strategy',
+registerEnumType(PowerOnStrategyEnum, {
+  name: 'PowerOnStrategyEnum',
+  description: 'Power on strategy',
   valuesConfig: {
     WOL: { description: 'Node powered on through WoL' },
     AO: { description: 'Node is alway on' },
     SP: { description: 'Node gets powered on through smart plug' },
     BPD: { description: 'Node gets powered on through button press device' }
+  }
+});
+
+registerEnumType(PowerOnDeviceTypeEnum, {
+  name: 'PowerOnDeviceTypeEnum',
+  description: 'Power On device type',
+  valuesConfig: {
+    SMART_PLUG: { description: 'Wifi smart plug' },
+    BUTTON_PRESS: { description: 'Button pressing device' }
   }
 });

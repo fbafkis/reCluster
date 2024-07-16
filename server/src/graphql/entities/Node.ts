@@ -26,7 +26,7 @@ import type * as Prisma from '@prisma/client';
 import { GraphQLBoolean, GraphQLID, GraphQLInt, GraphQLString } from 'graphql';
 import { Field, ObjectType } from 'type-graphql';
 import { GraphQLBigInt, GraphQLIP, GraphQLTimestamp } from 'graphql-scalars';
-import { NodeRoleEnum, NodePermissionEnum, PowerStrategyEnum } from '~/db';
+import { NodeRoleEnum, NodePermissionEnum, PowerOnStrategyEnum } from '~/db';
 // eslint-disable-next-line import/no-cycle
 import { Cpu } from './Cpu';
 // eslint-disable-next-line import/no-cycle
@@ -82,8 +82,8 @@ export class Node implements Prisma.Node {
   @Field(() => GraphQLInt, { description: 'Maximum power consumption' })
   maxPowerConsumption!: number;
 
-  @Field(() => PowerStrategyEnum, { description: 'Power strategy' })
-  powerStrategy!: PowerStrategyEnum;
+  @Field(() => PowerOnStrategyEnum, { description: 'Power on strategy' })
+  powerOnStrategy!: PowerOnStrategyEnum;
 
   @Field(() => PowerOnDevice, { description: 'Power on device' })
   powerOnDevice!: PowerOnDevice;

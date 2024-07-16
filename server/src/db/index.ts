@@ -27,7 +27,7 @@ export {
   CpuVendorEnum,
   WoLFlagEnum,
   PowerOnDeviceTypeEnum,
-  PowerStrategyEnum,
+  PowerOnStrategyEnum,
   PowerOnDevice,
   NodeRoleEnum,
   NodePermissionEnum,
