@@ -2930,7 +2930,7 @@ NODE_FACTS=$(
   printf '%s\n' "$NODE_FACTS" |
     jq \
       '
-        .powerOnStrategy = "WOL"
+        .powerOnStrategy = "AO"
       '
 )
 
