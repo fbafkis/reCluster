@@ -93,9 +93,9 @@ export class CreateNodeInput
   @Field(() => PowerOnStrategyEnum, { description: 'Node power on strategy' })
   powerOnStrategy!: PowerOnStrategyEnum;
 
-  @Field(() => CreatePowerOnDeviceInput, { description: 'Node interfaces' })
+  @Field(() => CreatePowerOnDeviceInput, { nullable:true, description: 'Node interfaces' })
   @ValidateNested({ each: true })
-  powerOnDevice!: CreatePowerOnDeviceInput;
+  powerOnDevice?: CreatePowerOnDeviceInput;
 
   @Field(() => [CreateInterfaceInput], { description: 'Node interfaces' })
   @ValidateNested({ each: true })

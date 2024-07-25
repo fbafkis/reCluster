@@ -3006,13 +3006,13 @@ configure_power_on_strategy() {
       case $CHOICE in
       "WOL")
         NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq '.powerOnStrategy = "WOL"')
-        NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq '.powerOnDevice = {}')
+        #NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq '.powerOnDevice = {}')
         INFO "The wake on lan power on strategy has been selected."
         whiptail --title "Power on strategy configuration" --infobox "The wake on lan (WOL) power on strategy has been selected." 12 78
         ;;
       "AO")
         NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq '.powerOnStrategy = "AO"')
-        NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq '.powerOnDevice = {}')
+        #NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq '.powerOnDevice = {}')
         INFO "The always on power on strategy has been selected."
         whiptail --title "Power on strategy configuration" --infobox "The always on (AO) power on strategy has been selected." 12 78
         ;;
@@ -3051,7 +3051,7 @@ configure_power_on_strategy() {
       case $CHOICE in
       "AO")
         NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq '.powerOnStrategy = "AO"')
-        NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq '.powerOnDevice = {}')
+        #NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq '.powerOnDevice = {}')
         INFO "The always on power on strategy has been selected."
         whiptail --title "Power on strategy configuration" --infobox "The always on (AO) power on strategy has been selected." 12 78
         ;;

@@ -91,163 +91,166 @@ export class NodeService {
     private readonly wolService: WoLService
   ) {}
 
-  // public create(args: CreateArgs, prismaTxn?: Prisma.TransactionClient) {
-  //   // eslint-disable-next-line @typescript-eslint/no-shadow
-  //   const fn = async (prisma: Prisma.TransactionClient) => {
-  //     logger.info(`Node service create: ${JSON.stringify(args)}`);
+//   public create(args: CreateArgs, prismaTxn?: Prisma.TransactionClient) {
+//     // eslint-disable-next-line @typescript-eslint/no-shadow
+//     const fn = async (prisma: Prisma.TransactionClient) => {
+//         logger.info(`Node service create: ${JSON.stringify(args)}`);
 
-  //     // Create or update cpu
-  //     const { id: cpuId } = await this.cpuService.upsert(
-  //       {
-  //         data: args.data.cpu,
-  //         select: { id: true }
-  //       },
-  //       prisma
-  //     );
+//         // Create or update cpu
+//         const { id: cpuId } = await this.cpuService.upsert(
+//             {
+//                 data: args.data.cpu,
+//                 select: { id: true }
+//             },
+//             prisma
+//         );
 
-  //     // Create or update node pool
-  //     const { id: nodePoolId } = await this.nodePoolService.upsert(
-  //       {
-  //         data: {
-  //           cpu: args.data.cpu.cores,
-  //           memory: args.data.memory,
-  //           roles: args.data.roles
-  //         },
-  //         select: { id: true }
-  //       },
-  //       prisma
-  //     );
+//         // Create or update node pool
+//         const { id: nodePoolId } = await this.nodePoolService.upsert(
+//             {
+//                 data: {
+//                     cpu: args.data.cpu.cores,
+//                     memory: args.data.memory,
+//                     roles: args.data.roles
+//                 },
+//                 select: { id: true }
+//             },
+//             prisma
+//         );
 
-  //     // Create
-  //     const { id, roles } = await prisma.node.create({
-  //       ...args,
-  //       select: { id: true, roles: true },
-  //       data: {
-  //         ...args.data,
-  //         name: `dummy.${args.data.address}`,
-  //         status: {
-  //           create: {
-  //             status: NodeStatusEnum.ACTIVE,
-  //             reason: 'NodeRegistered',
-  //             message: 'Node registered',
-  //             lastHeartbeat: new Date(),
-  //             lastTransition: new Date()
-  //           }
-  //         },
-  //         nodePool: { connect: { id: nodePoolId } },
-  //         cpu: { connect: { id: cpuId } },
-  //         storages: { createMany: { data: args.data.storages } },
-  //         interfaces: {
-  //           createMany: { data: args.data.interfaces }
-  //         },
-  //         powerOnDevice: {
-  //           create: {data: args.data.powerOnDevice}
-  //         }
-  //       }
-  //     });
+//         // Create the node
+//         const { id, roles } = await prisma.node.create({
+//             ...args,
+//             select: { id: true, roles: true },
+//             data: {
+//                 ...args.data,
+//                 name: `dummy.${args.data.address}`,
+//                 status: {
+//                     create: {
+//                         status: NodeStatusEnum.ACTIVE,
+//                         reason: 'NodeRegistered',
+//                         message: 'Node registered',
+//                         lastHeartbeat: new Date(),
+//                         lastTransition: new Date()
+//                     }
+//                 },
+//                 nodePool: { connect: { id: nodePoolId } },
+//                 cpu: { connect: { id: cpuId } },
+//                 storages: { createMany: { data: args.data.storages } },
+//                 interfaces: {
+//                     createMany: { data: args.data.interfaces }
+//                 },
+//                 powerOnDevice: args.data.powerOnDevice ? {
+//                     create: args.data.powerOnDevice
+//                 } : undefined
+//             }
+//         });
 
+//         // Update node name
+//         const node = await this.update(
+//             {
+//                 where: { id },
+//                 select: { id: true, roles: true, permissions: true },
+//                 data: {
+//                     name: `${isControllerNode(roles) ? 'controller' : 'worker'}.${id}`
+//                 }
+//             },
+//             prisma
+//         );
 
-  //     // Update name
-  //     const node = await this.update(
-  //       {
-  //         where: { id },
-  //         select: { id: true, roles: true, permissions: true },
-  //         data: {
-  //           name: `${isControllerNode(roles) ? 'controller' : 'worker'}.${id}`
-  //         }
-  //       },
-  //       prisma
-  //     );
+//         // Generate token
+//         return this.tokenService.sign({
+//             type: TokenTypes.NODE,
+//             id: node.id,
+//             roles: node.roles,
+//             permissions: node.permissions
+//         });
+//     };
 
-  //     // Generate token
-  //     return this.tokenService.sign({
-  //       type: TokenTypes.NODE,
-  //       id: node.id,
-  //       roles: node.roles,
-  //       permissions: node.permissions
-  //     });
-  //   };
+//     return prismaTxn ? fn(prismaTxn) : prisma.$transaction(fn);
+// }
 
-  //   return prismaTxn ? fn(prismaTxn) : prisma.$transaction(fn);
-  // }
+public create(args: CreateArgs, prismaTxn?: Prisma.TransactionClient) {
+  // eslint-disable-next-line @typescript-eslint/no-shadow
+  const fn = async (prisma: Prisma.TransactionClient) => {
+      logger.info(`Node service create: ${JSON.stringify(args)}`);
 
-  public create(args: CreateArgs, prismaTxn?: Prisma.TransactionClient) {
-    // eslint-disable-next-line @typescript-eslint/no-shadow
-    const fn = async (prisma: Prisma.TransactionClient) => {
-        logger.info(`Node service create: ${JSON.stringify(args)}`);
+      // Create or update cpu
+      const { id: cpuId } = await this.cpuService.upsert(
+          {
+              data: args.data.cpu,
+              select: { id: true }
+          },
+          prisma
+      );
 
-        // Create or update cpu
-        const { id: cpuId } = await this.cpuService.upsert(
-            {
-                data: args.data.cpu,
-                select: { id: true }
-            },
-            prisma
-        );
+      // Create or update node pool
+      const { id: nodePoolId } = await this.nodePoolService.upsert(
+          {
+              data: {
+                  cpu: args.data.cpu.cores,
+                  memory: args.data.memory,
+                  roles: args.data.roles
+              },
+              select: { id: true }
+          },
+          prisma
+      );
 
-        // Create or update node pool
-        const { id: nodePoolId } = await this.nodePoolService.upsert(
-            {
-                data: {
-                    cpu: args.data.cpu.cores,
-                    memory: args.data.memory,
-                    roles: args.data.roles
-                },
-                select: { id: true }
-            },
-            prisma
-        );
+      // Prepare powerOnDevice data if strategy is not WOL or AO
+      let powerOnDeviceData: any = undefined;
+      if (args.data.powerOnDevice && args.data.powerOnStrategy !== "WOL" && args.data.powerOnStrategy !== "AO") {
+          powerOnDeviceData = { create: args.data.powerOnDevice };
+      }
 
-        // Create the node
-        const { id, roles } = await prisma.node.create({
-            ...args,
-            select: { id: true, roles: true },
-            data: {
-                ...args.data,
-                name: `dummy.${args.data.address}`,
-                status: {
-                    create: {
-                        status: NodeStatusEnum.ACTIVE,
-                        reason: 'NodeRegistered',
-                        message: 'Node registered',
-                        lastHeartbeat: new Date(),
-                        lastTransition: new Date()
-                    }
-                },
-                nodePool: { connect: { id: nodePoolId } },
-                cpu: { connect: { id: cpuId } },
-                storages: { createMany: { data: args.data.storages } },
-                interfaces: {
-                    createMany: { data: args.data.interfaces }
-                },
-                powerOnDevice: args.data.powerOnDevice ? {
-                    create: args.data.powerOnDevice
-                } : undefined
-            }
-        });
+      // Create the node
+      const { id, roles } = await prisma.node.create({
+          ...args,
+          select: { id: true, roles: true },
+          data: {
+              ...args.data,
+              name: `dummy.${args.data.address}`,
+              status: {
+                  create: {
+                      status: NodeStatusEnum.ACTIVE,
+                      reason: 'NodeRegistered',
+                      message: 'Node registered',
+                      lastHeartbeat: new Date(),
+                      lastTransition: new Date()
+                  }
+              },
+              nodePool: { connect: { id: nodePoolId } },
+              cpu: { connect: { id: cpuId } },
+              storages: { createMany: { data: args.data.storages } },
+              interfaces: {
+                  createMany: { data: args.data.interfaces }
+              },
+              powerOnDevice: powerOnDeviceData
+          }
+      });
 
-        // Update node name
-        const node = await this.update(
-            {
-                where: { id },
-                select: { id: true, roles: true, permissions: true },
-                data: {
-                    name: `${isControllerNode(roles) ? 'controller' : 'worker'}.${id}`
-                }
-            },
-            prisma
-        );
+      // Update node name
+      const node = await this.update(
+          {
+              where: { id },
+              select: { id: true, roles: true, permissions: true },
+              data: {
+                  name: `${isControllerNode(roles) ? 'controller' : 'worker'}.${id}`
+              }
+          },
+          prisma
+      );
 
-        // Generate token
-        return this.tokenService.sign({
-            type: TokenTypes.NODE,
-            id: node.id,
-            roles: node.roles,
-            permissions: node.permissions
-        });
-    };
+      // Generate token
+      return this.tokenService.sign({
+          type: TokenTypes.NODE,
+          id: node.id,
+          roles: node.roles,
+          permissions: node.permissions
+      });
+  };
 
-    return prismaTxn ? fn(prismaTxn) : prisma.$transaction(fn);
+  return prismaTxn ? fn(prismaTxn) : prisma.$transaction(fn);
 }
 
   public findMany(
