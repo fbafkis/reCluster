@@ -43,7 +43,8 @@ import {
   NodePoolResolver,
   StatusNodeResolver,
   StatusResolver,
-  UserResolver
+  UserResolver,
+  NodePowerOnDeviceResolver
 } from './resolvers';
 import { authDirective } from './directives';
 
@@ -62,6 +63,7 @@ const schemaSimple = buildSchemaSync({
     NodeCpuResolver,
     NodeStorageResolver,
     NodeInterfaceResolver,
+    NodePowerOnDeviceResolver,
     NodeNodePoolResolver,
     NodeStatusResolver,
     NodePoolResolver,

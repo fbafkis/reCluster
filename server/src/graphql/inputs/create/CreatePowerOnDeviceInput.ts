@@ -21,29 +21,16 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-
-import {
-  GraphQLBigInt,
-  GraphQLIP,
-  GraphQLNonEmptyString
-} from 'graphql-scalars';
-import { GraphQLBoolean } from 'graphql';
-import { Field, InputType } from 'type-graphql';
-import { ArrayNotContains, ArrayUnique } from 'class-validator';
+import { InputType, Field } from 'type-graphql';
+import { PowerOnDeviceTypeEnum } from '~/db';
 import type { CreatePowerOnDeviceInput as ICreatePowerOnDeviceInput } from '~/types';
-import { PowerOnDeviceTypeEnum, WoLFlagEnum } from '~/db';
 
-@InputType({ description: 'Create Interface input' })
+@InputType({ description: 'Create Power on device input' })
 export class CreatePowerOnDeviceInput implements ICreatePowerOnDeviceInput {
-  @Field(() => GraphQLIP, { description: 'Power on device IP address' })
+
+  @Field(() => PowerOnDeviceTypeEnum)
+  deviceType!: PowerOnDeviceTypeEnum;
+
+  @Field()
   address!: string;
-
-  @Field(() => GraphQLBigInt, { description: 'Interface speed' })
-  speed!: bigint;
-
-  @Field(() => [PowerOnDeviceTypeEnum], {
-    description: 'Power on device type'
-  })
-  @ArrayUnique()
-  deviceType?: PowerOnDeviceTypeEnum;
 }

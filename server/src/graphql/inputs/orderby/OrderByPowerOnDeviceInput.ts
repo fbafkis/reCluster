@@ -31,16 +31,16 @@ export class OrderByPowerOnDeviceInput
   implements
     Partial<Omit<Prisma.PowerOnDeviceOrderByWithRelationInput, 'node'>>
 {
-  @Field(() => SortOrderEnum, { description: 'Power On Device identifier' })
+  @Field(() => SortOrderEnum, { description: 'Power on device identifier' })
   id?: SortOrderEnum;
 
   @Field(() => SortOrderEnum, { description: 'Node identifier' })
   nodeId?: SortOrderEnum;
 
-  @Field(() => SortOrderEnum, { description: 'Power On deviece type' })
+  @Field(() => SortOrderEnum, { description: 'Power on device type' })
   deviceType?: SortOrderEnum;
 
-  @Field(() => SortOrderEnum, { description: 'Power On device IP address' })
+  @Field(() => SortOrderEnum, { description: 'Power on device IP address' })
   address?: SortOrderEnum;
 
   @Field(() => SortOrderEnum, {

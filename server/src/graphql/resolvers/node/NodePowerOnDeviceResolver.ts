@@ -25,7 +25,7 @@
 import { Args, FieldResolver, Resolver, Root } from 'type-graphql';
 import { inject, injectable } from 'tsyringe';
 import { PowerOnDeviceService } from '~/services';
-import { FindManyInterfaceArgs } from '../../args';
+import { FindManyInterfaceArgs, FindManyPowerOnDevices, FindUniquePowerOnDeviceArgs } from '../../args';
 import { Node, Interface, PowerOnDevice } from '../../entities';
 
 @Resolver(Node)
@@ -36,14 +36,14 @@ export class NodePowerOnDeviceResolver {
     private readonly powerOnDeviceService: PowerOnDeviceService
   ) {}
 
-  @FieldResolver(() => [PowerOnDevice])
+  @FieldResolver(() => PowerOnDevice)
   public powerOnDevices(
     @Root() node: Node,
-    @Args() args: FindManyInterfaceArgs
+    @Args() args: FindUniquePowerOnDeviceArgs
   ) {
-    return this.powerOnDeviceService.findMany({
+    return this.powerOnDeviceService.findUnique({
       ...args,
-      where: { ...args.where, nodeId: node.id }
+      where: { nodeId: node.id }
     });
   }
 }

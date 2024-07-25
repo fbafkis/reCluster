@@ -770,6 +770,8 @@ NODE_FACTS='{}'
 TMP_DIR=
 #Sysbench binary path
 SYSBENCH_PATH="/usr/bin/sysbench"
+#Power on device IP
+POWER_ON_DEVICE_IP=
 
 # ================
 # CLEANUP
@@ -1050,12 +1052,7 @@ compile_sysbench() {
     apk del sysbench
 
     # Check the internet connection
-    if wget --spider --quiet http://www.google.com; then
-      # Update apk database
-      apk update
-    else
-      whiptail --title "Network Error" --msgbox "No internet connection, if some packages are missing, it will be impossible to install them automatically." 10 78
-    fi
+    assert_url_reachability "www.google.com"
 
     # Install all the required packages
     for package in $_sysbench_packages; do
@@ -1819,7 +1816,7 @@ select_interface() {
   done
 
   # Build the whiptail command for the radio list
-  whiptail_command="whiptail --radiolist \"Scegli un'interfaccia di rete\" 20 100 10 $whiptail_args 3>&1 1>&2 2>&3"
+  whiptail_command="whiptail --radiolist \"Choose a network interface\" 20 100 10 $whiptail_args 3>&1 1>&2 2>&3"
 
   selected_interface=$(sh -c "$whiptail_command")
 
@@ -1841,7 +1838,7 @@ select_interface() {
 
 }
 
-# iInterface management method
+#Interface management method
 read_interfaces_info() {
 
   _interfaces_info=$(read_interfaces)
@@ -1870,7 +1867,6 @@ read_interfaces_info() {
       _speed=0
     fi
 
-    # WoL
     _wol=$($SUDO ethtool "$_iname" | grep 'Wake-on' | grep -v 'Supports Wake-on' | sed -e 's/Wake-on://g' -e 's/[[:space:]]*//g')
     INFO "Wol: $_wol"
     case $_wol in
@@ -1881,18 +1877,35 @@ read_interfaces_info() {
       _supports_wol=1
       ;;
     *d*)
-      whiptail --title "Info" --msgbox "Wake-On-LAN for interface '$_iname' is disabled." 8 78
+      whiptail --title "Wake-On-Lan " --msgbox "Wake-On-LAN for interface '$_iname' is disabled." 8 78
       INFO "Wake-On-LAN for interface '$_iname' is disabled."
       # Ask the user if he wants to enable the WOL
       if whiptail --title "Enable WOL" --yesno "Do you want to enable Wake-On-LAN for '$_iname'?" 8 78; then
         # Enabling Wake-On-LAN
         $SUDO ethtool -s "$_iname" wol g
-        whiptail --title "WOL Enabled" --msgbox "Wake-on-LAN enabled for interface '$_iname'." 8 78
-        INFO "Wake-on-LAN enabled for interface '$_iname'."
-        _supports_wol=1
+        local exitstatus=$?
+        if [ $exitstatus -ne 0 ]; then
+          WARN "Failed to set WOL for interface '$_iname'. ethtool exit status: $exitstatus"
+        else
+          INFO "WOL command executed successfully for interface '$_iname'."
+        fi
+
+        # Verify if WOL is enabled
+        _wol=$($SUDO ethtool "$_iname" | grep "Wake-on" | grep -v 'Supports Wake-on' | awk -F': ' '{print $2}')
+        INFO "WOL: $_wol"
+        if [ "$_wol" == "g" ]; then
+          whiptail --title "WOL Enabled" --msgbox "Wake-on-LAN enabled for interface '$_iname'." 8 78
+          INFO "Wake-on-LAN enabled for interface '$_iname'."
+          _interfaces_info=$(read_interfaces)
+          _supports_wol=1
+        else
+          whiptail --title "WOL Not Enabled" --msgbox "Failed to enable Wake-on-LAN for interface '$_iname'. Current WOL flag: $_wol" 8 78
+          WARN "Wake-on-LAN enabling failed for interface '$_iname'. Current WOL flag: $_wol"
+          _supports_wol=0
+        fi
       else
-        whiptail --title "WOL Not Enabled" --msgbox "Wake-on-LAN enabling failed for interface '$_iname'." 8 78
-        WARN "Wake-on-LAN enabling failed for interface '$_iname'."
+        whiptail --title "WOL Not Enabled" --msgbox "Wake-on-LAN enabling cancelled for interface '$_iname'." 8 78
+        WARN "Wake-on-LAN enabling cancelled for interface '$_iname'."
         _supports_wol=0
       fi
       ;;
@@ -1902,6 +1915,39 @@ read_interfaces_info() {
       whiptail --title "Info" --msgbox "Interface '$_iname' doesn't support Wake-on-LAN" 8 78
       ;;
     esac
+
+    # # WoL
+    # _wol=$($SUDO ethtool "$_iname" | grep 'Wake-on' | grep -v 'Supports Wake-on' | sed -e 's/Wake-on://g' -e 's/[[:space:]]*//g')
+    # INFO "Wol: $_wol"
+    # case $_wol in
+    # *g* | *b*)
+    #   # Supported WOL
+    #   whiptail --title "Info" --msgbox "Wake-On-LAN already enabled for interface '$_iname'." 8 78
+    #   INFO "Wake-On-LAN already enabled for interface '$_iname'."
+    #   _supports_wol=1
+    #   ;;
+    # *d*)
+    #   whiptail --title "Info" --msgbox "Wake-On-LAN for interface '$_iname' is disabled." 8 78
+    #   INFO "Wake-On-LAN for interface '$_iname' is disabled."
+    #   # Ask the user if he wants to enable the WOL
+    #   if whiptail --title "Enable WOL" --yesno "Do you want to enable Wake-On-LAN for '$_iname'?" 8 78; then
+    #     # Enabling Wake-On-LAN
+    #     $SUDO ethtool -s "$_iname" wol g
+    #     whiptail --title "WOL Enabled" --msgbox "Wake-on-LAN enabled for interface '$_iname'." 8 78
+    #     INFO "Wake-on-LAN enabled for interface '$_iname'."
+    #     _supports_wol=1
+    #   else
+    #     whiptail --title "WOL Not Enabled" --msgbox "Wake-on-LAN enabling failed for interface '$_iname'." 8 78
+    #     WARN "Wake-on-LAN enabling failed for interface '$_iname'."
+    #     _supports_wol=0
+    #   fi
+    #   ;;
+    # *)
+    #   _supports_wol=0
+    #   # Wake-on-LAN not supported
+    #   whiptail --title "Info" --msgbox "Interface '$_iname' doesn't support Wake-on-LAN" 8 78
+    #   ;;
+    # esac
 
     ### Cases management ###
 
@@ -2924,15 +2970,163 @@ read_power_consumptions() {
   )
 }
 
-# Boot strategy
+####### Power on strategy configuration #######
 
-NODE_FACTS=$(
-  printf '%s\n' "$NODE_FACTS" |
-    jq \
-      '
-        .powerOnStrategy = "AO"
-      '
-)
+# Function to configure power on strategy
+configure_power_on_strategy() {
+  INFO "Entering power on strategy configuration ..."
+
+  DEBUG "$_valid_interfaces"
+
+  if [ "$INIT_CLUSTER" = true ]; then
+    whiptail --title "Power on strategy configuration" --infobox "Now it's time to select the desired power on strategy." 12 78
+    INFO "Power on strategy configuration."
+
+    _controller_iface_has_wol=$(echo "$_valid_interfaces" | jq -r '
+            .[] | select(.controller == true) | .wol | index("d") | not
+        ')
+
+    DEBUG "Controller interface has WOL: $_controller_iface_has_wol"
+
+    if [ "$_controller_iface_has_wol" == "true" ]; then
+      CHOICE=$(whiptail --title "Power on strategy configuration" --radiolist \
+        "Choose your desired power on strategy. Read the documentation to learn more about. Since Wake On Lan is available for the controller interface, it is pre-selected as default option." 15 50 4 \
+        "WOL" "Wake On Lan" ON \
+        "AO" "Always On" OFF \
+        "SP" "Smart Plug" OFF \
+        "BPD" "Button Press Device" OFF 3>&1 1>&2 2>&3)
+
+      # Exit if the user cancels the dialog
+      exitstatus=$?
+      if [ $exitstatus != 0 ]; then
+        FATAL "The configuration of the power strategy is mandatory."
+      fi
+
+      # Handle the selection with a case construct
+      case $CHOICE in
+      "WOL")
+        NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq '.powerOnStrategy = "WOL"')
+        NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq '.powerOnDevice = {}')
+        INFO "The wake on lan power on strategy has been selected."
+        whiptail --title "Power on strategy configuration" --infobox "The wake on lan (WOL) power on strategy has been selected." 12 78
+        ;;
+      "AO")
+        NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq '.powerOnStrategy = "AO"')
+        NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq '.powerOnDevice = {}')
+        INFO "The always on power on strategy has been selected."
+        whiptail --title "Power on strategy configuration" --infobox "The always on (AO) power on strategy has been selected." 12 78
+        ;;
+      "SP")
+        get_power_on_smart_plug_ip_address
+        NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq '.powerOnStrategy = "SP"')
+        NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq --arg address "$POWER_ON_DEVICE_IP" --arg deviceType "$POWER_ON_DEVICE_TYPE" '.powerOnDevice = { address: $address, deviceType: "SMART_PLUG" }')
+        INFO "The smart plug power on strategy has been selected."
+        whiptail --title "Power on strategy configuration" --infobox "The smart plug (SP) power on strategy has been selected." 12 78
+        ;;
+      "BPD")
+        get_button_press_device_ip_address
+        NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq '.powerOnStrategy = "BPD"')
+        NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq --arg address "$POWER_ON_DEVICE_IP" --arg deviceType "$POWER_ON_DEVICE_TYPE" '.powerOnDevice = { address: $address, deviceType: "BUTTON_PRESS" }')
+        INFO "The button press device power on strategy has been selected."
+        whiptail --title "Power on strategy configuration" --infobox "The button press device (BPD) power on strategy has been selected." 12 78
+        ;;
+      *)
+        FATAL "Invalid power on strategy configuration"
+        ;;
+      esac
+    else
+      CHOICE=$(whiptail --title "Power on strategy selection" --radiolist \
+        "Choose your desired power on strategy. Read the documentation to learn more about. Since Wake On Lan is NOT available for the controller interface, you can choose between the other 3 strategies." 15 50 4 \
+        "AO" "Always On" ON \
+        "SP" "Smart Plug" OFF \
+        "BPD" "Button Press Device" OFF 3>&1 1>&2 2>&3)
+
+      # Exit if the user cancels the dialog
+      exitstatus=$?
+      if [ $exitstatus != 0 ]; then
+        FATAL "The configuration of the power strategy is mandatory."
+      fi
+
+      # Handle the selection with a case construct
+      case $CHOICE in
+      "AO")
+        NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq '.powerOnStrategy = "AO"')
+        NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq '.powerOnDevice = {}')
+        INFO "The always on power on strategy has been selected."
+        whiptail --title "Power on strategy configuration" --infobox "The always on (AO) power on strategy has been selected." 12 78
+        ;;
+      "SP")
+        get_power_on_smart_plug_ip_address
+        NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq '.powerOnStrategy = "SP"')
+        NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq --arg address "$POWER_ON_DEVICE_IP" --arg deviceType "$POWER_ON_DEVICE_TYPE" '.powerOnDevice = { address: $address, deviceType: "SMART_PLUG" }')
+        INFO "The smart plug power on strategy has been selected."
+        whiptail --title "Power on strategy configuration" --infobox "The smart plug (SP) power on strategy has been selected." 12 78
+        ;;
+      "BPD")
+        get_button_press_device_ip_address
+        NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq '.powerOnStrategy = "BPD"')
+        NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq --arg address "$POWER_ON_DEVICE_IP" --arg deviceType "$POWER_ON_DEVICE_TYPE" '.powerOnDevice = { address: $address, deviceType: "BUTTON_PRESS" }')
+        INFO "The button press device power on strategy has been selected."
+        whiptail --title "Power on strategy configuration" --infobox "The button press device (BPD) power on strategy has been selected." 12 78
+        ;;
+      *)
+        FATAL "Invalid power on strategy configuration"
+        ;;
+      esac
+    fi
+  else
+    whiptail --title "Power on strategy configuration" --infobox "Since this is a controller node no power on strategy choice is required." 12 78
+    INFO "Power on strategy configuration skipped since this is a controller node."
+  fi
+}
+
+# Aux function to get the IP of the power on smart plug
+
+get_power_on_smart_plug_ip_address() {
+  IP_ADDRESS=$(whiptail --title "Power on smart plug IP Address" --inputbox "Please enter the IP address of the power on smart plug:" 10 60 3>&1 1>&2 2>&3)
+
+  # Exit if the user cancels the dialog
+  exitstatus=$?
+  if [ $exitstatus != 0 ]; then
+    FATAL "Power on smart plug IP address input canceled."
+  fi
+
+  # Validate the IP address format
+  if echo "$IP_ADDRESS" | grep -Eq '^(([1-9][0-9]{0,1}|1[0-9]{2}|2[0-4][0-9]|25[0-4])\.([0-9]|[1-9][0-9]{0,1}|1[0-9]{2}|2[0-4][0-9]|25[0-4])\.([0-9]|[1-9][0-9]{0,1}|1[0-9]{2}|2[0-4][0-9]|25[0-4])\.([0-9]|[1-9][0-9]{0,1}|1[0-9]{2}|2[0-4][0-9]|25[0-4]))$'; then
+    POWER_ON_DEVICE_IP=$IP_ADDRESS
+    INFO "The power on smart plug IP address is: $POWER_ON_DEVICE_IP."
+    whiptail --title "Power on smart plug IP" --infobox "The power on smart plug IP is $IP_ADDRESS." 12 78
+  else
+    INFO "Invalid IP address format."
+    whiptail --title "Invalid IP address" --msgbox "Invalid IP address format." 8 35
+    get_power_on_smart_plug_ip_address
+  fi
+}
+
+# Aux function to get the IP of the button press device
+
+get_button_press_device_ip_address() {
+  IP_ADDRESS=$(whiptail --title "Button press device IP Address" --inputbox "Please enter the IP address of the button press device:" 10 60 3>&1 1>&2 2>&3)
+
+  # Exit if the user cancels the dialog
+  exitstatus=$?
+  if [ $exitstatus != 0 ]; then
+    FATAL "Button press device IP address input canceled."
+  fi
+
+  # Validate the IP address format
+  if echo "$IP_ADDRESS" | grep -Eq '^(([1-9][0-9]{0,1}|1[0-9]{2}|2[0-4][0-9]|25[0-4])\.([0-9]|[1-9][0-9]{0,1}|1[0-9]{2}|2[0-4][0-9]|25[0-4])\.([0-9]|[1-9][0-9]{0,1}|1[0-9]{2}|2[0-4][0-9]|25[0-4])\.([0-9]|[1-9][0-9]{0,1}|1[0-9]{2}|2[0-4][0-9]|25[0-4]))$'; then
+    POWER_ON_DEVICE_IP=$IP_ADDRESS
+    INFO "The button press device IP address is: $POWER_ON_DEVICE_IP."
+    whiptail --title "Button press device IP" --infobox "The button press device IP is $IP_ADDRESS." 12 78
+  else
+    INFO "Invalid IP address format."
+    whiptail --title "Invalid IP address" --msgbox "Invalid IP address format." 8 35
+    get_power_on_smart_plug_ip_address
+  fi
+}
+
+##############################################
 
 # Finalize node facts
 finalize_node_facts() {
@@ -3917,6 +4111,7 @@ configure_k8s() {
   read_system_info
   run_benchmarks
   read_power_consumptions
+  configure_power_on_strategy
   finalize_node_facts
   install_k3s
   install_node_exporter

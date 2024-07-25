@@ -21,7 +21,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-
 import type { Prisma } from '@prisma/client';
+import { PowerOnDeviceTypeEnum } from '~/db';
 
-export type CreatePowerOnDeviceInput = {};
+export type CreatePowerOnDeviceInput = {
+  deviceType: PowerOnDeviceTypeEnum; // Ensure this matches the enum type
+  address: string;
+};

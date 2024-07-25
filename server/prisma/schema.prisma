@@ -177,7 +177,7 @@ enum WoLFlagEnum {
 
 model PowerOnDevice {
   id         String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  node       Node                  @relation(fields: [nodeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  node       Node                  @relation(fields: [nodeId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "node_id")
   nodeId     String                @unique @db.Uuid
   deviceType PowerOnDeviceTypeEnum
   address    String

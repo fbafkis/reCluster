@@ -36,6 +36,7 @@ import { NodeRoleEnum, NodePermissionEnum, PowerOnStrategyEnum } from '~/db';
 import { CreateCpuInput } from './CreateCpuInput';
 import { CreateStorageInput } from './CreateStorageInput';
 import { CreateInterfaceInput } from './CreateInterfaceInput';
+import { CreatePowerOnDeviceInput } from './CreatePowerOnDeviceInput';
 
 @InputType({ description: 'Create Node input' })
 export class CreateNodeInput
@@ -91,6 +92,10 @@ export class CreateNodeInput
 
   @Field(() => PowerOnStrategyEnum, { description: 'Node power on strategy' })
   powerOnStrategy!: PowerOnStrategyEnum;
+
+  @Field(() => CreatePowerOnDeviceInput, { description: 'Node interfaces' })
+  @ValidateNested({ each: true })
+  powerOnDevice!: CreatePowerOnDeviceInput;
 
   @Field(() => [CreateInterfaceInput], { description: 'Node interfaces' })
   @ValidateNested({ each: true })
