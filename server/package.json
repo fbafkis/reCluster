@@ -49,6 +49,7 @@
     "@graphql-tools/utils": "^9.2.0",
     "@kubernetes/client-node": "^0.18.1",
     "@prisma/client": "^4.8.0",
+    "axios": "^1.7.2",
     "bcryptjs": "^2.4.3",
     "class-validator": "^0.14.0",
     "convert": "^4.10.0",

@@ -22,21 +22,12 @@
  * SOFTWARE.
  */
 
-import wol from 'wake_on_lan';
+import { InternalServerError } from './InternalServerError';
 
-type WakeArgs = {
-  mac: string;
-  opts?: wol.WakeOptions;
-};
+export class PowerOnDeviceError extends InternalServerError {
+  public constructor(cause?: string) {
+    super({ extensions: { kind: 'POWER_ON_DEVICE', cause: cause || null } });
 
-export class WoLService {
-  public wake(args: WakeArgs): Promise<void> {
-    return new Promise((resolve, reject) => {
-      wol.wake(args.mac, args.opts ?? {}, (error: unknown) => {
-        if (error) return reject(error);
-        return resolve();
-      });
-    });
+    Object.setPrototypeOf(this, PowerOnDeviceError.prototype);
   }
 }
-

@@ -42,6 +42,8 @@ import { NodePoolService } from './NodePoolService';
 import { StatusService } from './StatusService';
 import { K8sService } from './K8sService';
 import { WoLService } from './WoLService';
+import {SmartPlugService} from './SmartPlugService'
+import {ButtonPressDeviceService} from './ButtonPressDeviceService'
 
 type CreateArgs = Omit<Prisma.NodeCreateArgs, 'include' | 'data'> & {
   data: CreateNodeInput;
@@ -88,87 +90,12 @@ export class NodeService {
     @inject(TokenService)
     private readonly tokenService: TokenService,
     @inject(WoLService)
-    private readonly wolService: WoLService
+    private readonly wolService: WoLService,
+    @inject(SmartPlugService)
+    private readonly smartPlugService: SmartPlugService,
+    @inject(ButtonPressDeviceService)
+    private readonly buttonPressDeviceService: ButtonPressDeviceService
   ) {}
-
-//   public create(args: CreateArgs, prismaTxn?: Prisma.TransactionClient) {
-//     // eslint-disable-next-line @typescript-eslint/no-shadow
-//     const fn = async (prisma: Prisma.TransactionClient) => {
-//         logger.info(`Node service create: ${JSON.stringify(args)}`);
-
-//         // Create or update cpu
-//         const { id: cpuId } = await this.cpuService.upsert(
-//             {
-//                 data: args.data.cpu,
-//                 select: { id: true }
-//             },
-//             prisma
-//         );
-
-//         // Create or update node pool
-//         const { id: nodePoolId } = await this.nodePoolService.upsert(
-//             {
-//                 data: {
-//                     cpu: args.data.cpu.cores,
-//                     memory: args.data.memory,
-//                     roles: args.data.roles
-//                 },
-//                 select: { id: true }
-//             },
-//             prisma
-//         );
-
-//         // Create the node
-//         const { id, roles } = await prisma.node.create({
-//             ...args,
-//             select: { id: true, roles: true },
-//             data: {
-//                 ...args.data,
-//                 name: `dummy.${args.data.address}`,
-//                 status: {
-//                     create: {
-//                         status: NodeStatusEnum.ACTIVE,
-//                         reason: 'NodeRegistered',
-//                         message: 'Node registered',
-//                         lastHeartbeat: new Date(),
-//                         lastTransition: new Date()
-//                     }
-//                 },
-//                 nodePool: { connect: { id: nodePoolId } },
-//                 cpu: { connect: { id: cpuId } },
-//                 storages: { createMany: { data: args.data.storages } },
-//                 interfaces: {
-//                     createMany: { data: args.data.interfaces }
-//                 },
-//                 powerOnDevice: args.data.powerOnDevice ? {
-//                     create: args.data.powerOnDevice
-//                 } : undefined
-//             }
-//         });
-
-//         // Update node name
-//         const node = await this.update(
-//             {
-//                 where: { id },
-//                 select: { id: true, roles: true, permissions: true },
-//                 data: {
-//                     name: `${isControllerNode(roles) ? 'controller' : 'worker'}.${id}`
-//                 }
-//             },
-//             prisma
-//         );
-
-//         // Generate token
-//         return this.tokenService.sign({
-//             type: TokenTypes.NODE,
-//             id: node.id,
-//             roles: node.roles,
-//             permissions: node.permissions
-//         });
-//     };
-
-//     return prismaTxn ? fn(prismaTxn) : prisma.$transaction(fn);
-// }
 
 public create(args: CreateArgs, prismaTxn?: Prisma.TransactionClient) {
   // eslint-disable-next-line @typescript-eslint/no-shadow
@@ -413,33 +340,71 @@ public create(args: CreateArgs, prismaTxn?: Prisma.TransactionClient) {
           select: {
             nodePoolId: true,
             nodePoolAssigned: true,
+            powerOnStrategy: true,
             address: process.platform === 'win32',
             interfaces: {
               where: { wol: { isEmpty: false } },
               select: { address: true }
+            },
+            powerOnDevice: {
+              select: { address: true, deviceType: true }
             }
           }
         },
         prisma
       );
+
       if (node.nodePoolAssigned)
         throw new NodeError(
           `Node '${args.where.id}' is assigned to node pool ${node.nodePoolId}`
         );
-      if (node.interfaces.length === 0)
-        throw new NodeError(`Node '${args.where.id}' has no WoL interfaces`);
 
-      // Bootstrap
-      await Promise.any(
-        node.interfaces.map((intf) =>
-          this.wolService.wake({
-            mac: intf.address,
-            opts: {
-              ...(process.platform === 'win32' && { address: node.address })
-            }
-          })
-        )
-      );
+      // Handle different power on strategies
+      switch (node.powerOnStrategy) {
+        case 'WOL':
+          if (node.interfaces.length === 0)
+            throw new NodeError(`Node '${args.where.id}' has no WoL interfaces`);
+
+          // Wake on LAN strategy
+          await Promise.any(
+            node.interfaces.map((intf) =>
+              this.wolService.wake({
+                mac: intf.address,
+                opts: {
+                  ...(process.platform === 'win32' && { address: node.address })
+                }
+              })
+            )
+          );
+          break;
+
+        case 'AO':
+          // Always On strategy
+          // No specific action needed as the node is always on
+          logger.info(`Node '${args.where.id}' is configured as Always On (AO).`);
+          break;
+
+        case 'SP':
+          // Smart Plug strategy
+          if (!node.powerOnDevice || node.powerOnDevice.deviceType !== 'SMART_PLUG')
+            throw new NodeError(`Node '${args.where.id}' does not have a valid Smart Plug configured.`);
+
+          // Add logic to handle Smart Plug power on
+          await this.smartPlugService.powerOn(node.powerOnDevice.address, args.where.id);
+          break;
+
+        case 'BPD':
+          // Button Press Device strategy
+          if (!node.powerOnDevice || node.powerOnDevice.deviceType !== 'BUTTON_PRESS')
+            throw new NodeError(`Node '${args.where.id}' does not have a valid Button Press Device configured.`);
+
+          // Add logic to handle Button Press Device power on
+          await this.buttonPressDeviceService.pressButton(node.powerOnDevice.address, args.where.id);
+          break;
+
+        default:
+          throw new NodeError(`Node '${args.where.id}' has an unknown power on strategy '${node.powerOnStrategy}'.`);
+      }
 
       // Update
       await this.update(
@@ -460,4 +425,64 @@ public create(args: CreateArgs, prismaTxn?: Prisma.TransactionClient) {
 
     return prismaTxn ? fn(prismaTxn) : prisma.$transaction(fn);
   }
+
+  // public boot(args: BootArgs, prismaTxn?: Prisma.TransactionClient) {
+  //   // eslint-disable-next-line @typescript-eslint/no-shadow
+  //   const fn = async (prisma: Prisma.TransactionClient) => {
+  //     logger.info(`Node service boot: ${JSON.stringify(args)}`);
+
+  //     // Check if node exists and not assigned to node pool
+  //     const node = await this.findUniqueOrThrow(
+  //       {
+  //         where: { id: args.where.id },
+  //         select: {
+  //           nodePoolId: true,
+  //           nodePoolAssigned: true,
+  //           address: process.platform === 'win32',
+  //           interfaces: {
+  //             where: { wol: { isEmpty: false } },
+  //             select: { address: true }
+  //           }
+  //         }
+  //       },
+  //       prisma
+  //     );
+  //     if (node.nodePoolAssigned)
+  //       throw new NodeError(
+  //         `Node '${args.where.id}' is assigned to node pool ${node.nodePoolId}`
+  //       );
+  //     if (node.interfaces.length === 0)
+  //       throw new NodeError(`Node '${args.where.id}' has no WoL interfaces`);
+
+  //     // Bootstrap
+  //     await Promise.any(
+  //       node.interfaces.map((intf) =>
+  //         this.wolService.wake({
+  //           mac: intf.address,
+  //           opts: {
+  //             ...(process.platform === 'win32' && { address: node.address })
+  //           }
+  //         })
+  //       )
+  //     );
+
+  //     // Update
+  //     await this.update(
+  //       {
+  //         where: { id: args.where.id },
+  //         data: {
+  //           nodePoolAssigned: true,
+  //           status: {
+  //             status: NodeStatusEnum.BOOTING,
+  //             reason: args.status?.reason ?? 'NodeBoot',
+  //             message: args.status?.message ?? 'Node boot'
+  //           }
+  //         }
+  //       },
+  //       prisma
+  //     );
+  //   };
+
+  //   return prismaTxn ? fn(prismaTxn) : prisma.$transaction(fn);
+  // }
 }

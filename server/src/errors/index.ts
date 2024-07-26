@@ -31,3 +31,4 @@ export * from './NodeError';
 export * from './NodePoolError';
 export * from './TokenError';
 export * from './ValidationError';
+export * from './PowerOnDeviceError';
