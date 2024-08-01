@@ -2579,6 +2579,7 @@ verify_system() {
   assert_cmd grep
   assert_cmd id
   assert_cmd ip
+  assert_cmd iputils
   assert_cmd jq
   assert_cmd lscpu
   assert_cmd lsblk

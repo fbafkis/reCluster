@@ -44,6 +44,8 @@ import { K8sService } from './K8sService';
 import { WoLService } from './WoLService';
 import {SmartPlugService} from './SmartPlugService'
 import {ButtonPressDeviceService} from './ButtonPressDeviceService'
+import { exec } from 'child_process';
+
 
 type CreateArgs = Omit<Prisma.NodeCreateArgs, 'include' | 'data'> & {
   data: CreateNodeInput;
@@ -284,7 +286,51 @@ public create(args: CreateArgs, prismaTxn?: Prisma.TransactionClient) {
     return prismaTxn ? fn(prismaTxn) : prisma.$transaction(fn);
   }
 
-  public shutdown(args: ShutdownArgs, prismaTxn?: Prisma.TransactionClient) {
+  // public shutdown(args: ShutdownArgs, prismaTxn?: Prisma.TransactionClient) {
+  //   // eslint-disable-next-line @typescript-eslint/no-shadow
+  //   const fn = async (prisma: Prisma.TransactionClient) => {
+  //     logger.info(`Node service shutdown: ${JSON.stringify(args)}`);
+
+  //     // Check if node exists and not assigned to node pool
+  //     const node = await this.findUniqueOrThrow(
+  //       {
+  //         where: { id: args.where.id },
+  //         select: { nodePoolId: true, nodePoolAssigned: true, address: true }
+  //       },
+  //       prisma
+  //     );
+  //     if (node.nodePoolAssigned)
+  //       throw new NodeError(
+  //         `Node '${args.where.id}' is assigned to node pool ${node.nodePoolId}`
+  //       );
+
+  //     // Shutdown
+  //     const ssh = await SSH.connect({ host: node.address });
+  //     await ssh.execCommand({
+  //       command: 'sudo poweroff',
+  //       disconnect: true
+  //     });
+
+  //     // Update
+  //     await this.update(
+  //       {
+  //         where: { id: args.where.id },
+  //         data: {
+  //           status: {
+  //             status: NodeStatusEnum.INACTIVE,
+  //             reason: args.status?.reason ?? 'NodeShutdown',
+  //             message: args.status?.message ?? 'Node shutdown'
+  //           }
+  //         }
+  //       },
+  //       prisma
+  //     );
+  //   };
+
+  //   return prismaTxn ? fn(prismaTxn) : prisma.$transaction(fn);
+  // }
+
+public shutdown(args: ShutdownArgs, prismaTxn?: Prisma.TransactionClient) {
     // eslint-disable-next-line @typescript-eslint/no-shadow
     const fn = async (prisma: Prisma.TransactionClient) => {
       logger.info(`Node service shutdown: ${JSON.stringify(args)}`);
@@ -293,36 +339,86 @@ public create(args: CreateArgs, prismaTxn?: Prisma.TransactionClient) {
       const node = await this.findUniqueOrThrow(
         {
           where: { id: args.where.id },
-          select: { nodePoolId: true, nodePoolAssigned: true, address: true }
-        },
-        prisma
-      );
-      if (node.nodePoolAssigned)
-        throw new NodeError(
-          `Node '${args.where.id}' is assigned to node pool ${node.nodePoolId}`
-        );
-
-      // Shutdown
-      const ssh = await SSH.connect({ host: node.address });
-      await ssh.execCommand({
-        command: 'sudo poweroff',
-        disconnect: true
-      });
-
-      // Update
-      await this.update(
-        {
-          where: { id: args.where.id },
-          data: {
-            status: {
-              status: NodeStatusEnum.INACTIVE,
-              reason: args.status?.reason ?? 'NodeShutdown',
-              message: args.status?.message ?? 'Node shutdown'
+          select: {
+            nodePoolId: true,
+            nodePoolAssigned: true,
+            address: true,
+            powerOnStrategy: true,
+            powerOnDevice: {
+              select: { address: true, deviceType: true }
             }
           }
         },
         prisma
       );
+
+      if (node.nodePoolAssigned) {
+        throw new NodeError(
+          `Node '${args.where.id}' is assigned to node pool ${node.nodePoolId}`
+        );
+      }
+
+      // Handle different power strategies for shutdown
+      switch (node.powerOnStrategy) {
+        case 'AO':
+          // Always On strategy
+          logger.info(`Node '${args.where.id}' is configured as Always On (AO). It will not be shut down.`);
+          break;
+
+        case 'SP':
+          // Smart Plug strategy
+          if (!node.powerOnDevice || node.powerOnDevice.deviceType !== 'SMART_PLUG') {
+            throw new NodeError(`Node '${args.where.id}' does not have a valid power on smart plug configured.`);
+          }
+
+          {
+            // Perform shutdown via SSH
+            const ssh = await SSH.connect({ host: node.address });
+            await ssh.execCommand({
+              command: 'sudo poweroff',
+              disconnect: true
+            });
+
+            // Wait for node to be off
+            await this.waitForNodeToBeOff(node.address);
+
+            // Wait after ping unreachability for 15 seconds before turning off the smart plug to be sure that the node is really powered off gracefully
+            await new Promise((resolve) => setTimeout(resolve, 15000));
+            await this.smartPlugService.powerOff(node.powerOnDevice.address, args.where.id);
+          }
+          break;
+
+        case 'WOL':
+        case 'BPD':
+          {
+            // Wake on LAN and Button Press Device strategy
+            // Perform shutdown via SSH
+            const ssh = await SSH.connect({ host: node.address });
+            await ssh.execCommand({
+              command: 'sudo poweroff',
+              disconnect: true
+            });
+
+            // Update node status
+            await this.update(
+              {
+                where: { id: args.where.id },
+                data: {
+                  status: {
+                    status: NodeStatusEnum.INACTIVE,
+                    reason: args.status?.reason ?? 'NodeShutdown',
+                    message: args.status?.message ?? 'Node shutdown'
+                  }
+                }
+              },
+              prisma
+            );
+          }
+          break;
+
+        default:
+          throw new NodeError(`Node '${args.where.id}' has an unknown power on strategy '${node.powerOnStrategy}'.`);
+      }
     };
 
     return prismaTxn ? fn(prismaTxn) : prisma.$transaction(fn);
@@ -381,7 +477,7 @@ public create(args: CreateArgs, prismaTxn?: Prisma.TransactionClient) {
         case 'AO':
           // Always On strategy
           // No specific action needed as the node is always on
-          logger.info(`Node '${args.where.id}' is configured as Always On (AO).`);
+          logger.info(`Node '${args.where.id}' power on strategy is configured as Always On (AO). Nothing to do.`);
           break;
 
         case 'SP':
@@ -485,4 +581,30 @@ public create(args: CreateArgs, prismaTxn?: Prisma.TransactionClient) {
 
   //   return prismaTxn ? fn(prismaTxn) : prisma.$transaction(fn);
   // }
+
+ // Aux method to wait for node to be off and check ping reachabilitry
+  private async waitForNodeToBeOff(address: string): Promise<void> {
+    const pingNode = (): Promise<boolean> => {
+      return new Promise((resolve) => {
+        exec(`ping -c 1 ${address}`, (error) => {
+          resolve(!error);
+        });
+      });
+    };
+
+    // Wait for a maximum of 1 minute, checking every 10 seconds
+    for (let i = 0; i < 6; i++) {
+      const isNodeOn = await pingNode();
+      if (!isNodeOn) {
+        logger.info(`Node at ${address} is now off.`);
+        return;
+      }
+      logger.info(`Node at ${address} is still on, checking again in 10 seconds...`);
+      await new Promise((resolve) => setTimeout(resolve, 10000));
+    }
+
+    logger.warn(`Node at ${address} did not go off after 2 minutes and is still reachable via ping.`);
+    throw new NodeError(`Node at ${address} did not shut down within the expected time.`);
+  }
+
 }
