@@ -330,7 +330,7 @@ public create(args: CreateArgs, prismaTxn?: Prisma.TransactionClient) {
   //   return prismaTxn ? fn(prismaTxn) : prisma.$transaction(fn);
   // }
 
-public shutdown(args: ShutdownArgs, prismaTxn?: Prisma.TransactionClient) {
+  public shutdown(args: ShutdownArgs, prismaTxn?: Prisma.TransactionClient) {
     // eslint-disable-next-line @typescript-eslint/no-shadow
     const fn = async (prisma: Prisma.TransactionClient) => {
       logger.info(`Node service shutdown: ${JSON.stringify(args)}`);
@@ -439,8 +439,7 @@ public shutdown(args: ShutdownArgs, prismaTxn?: Prisma.TransactionClient) {
             powerOnStrategy: true,
             address: process.platform === 'win32',
             interfaces: {
-              where: { wol: { isEmpty: false } },
-              select: { address: true }
+              select: { address: true, controller: true, wol: true }
             },
             powerOnDevice: {
               select: { address: true, deviceType: true }
@@ -458,25 +457,23 @@ public shutdown(args: ShutdownArgs, prismaTxn?: Prisma.TransactionClient) {
       // Handle different power on strategies
       switch (node.powerOnStrategy) {
         case 'WOL':
-          if (node.interfaces.length === 0)
-            throw new NodeError(`Node '${args.where.id}' has no WoL interfaces`);
+          const controllerInterface = node.interfaces.find(intf => intf.controller);
 
-          // Wake on LAN strategy
-          await Promise.any(
-            node.interfaces.map((intf) =>
-              this.wolService.wake({
-                mac: intf.address,
-                opts: {
-                  ...(process.platform === 'win32' && { address: node.address })
-                }
-              })
-            )
-          );
+          if (!controllerInterface) {
+            throw new NodeError(`Node '${args.where.id}' does not have a controller interface with WoL capability`);
+          }
+
+          // Wake on LAN strategy using the controller interface
+          await this.wolService.wake({
+            mac: controllerInterface.address,
+            opts: {
+              ...(process.platform === 'win32' && { address: node.address })
+            }
+          });
           break;
 
         case 'AO':
           // Always On strategy
-          // No specific action needed as the node is always on
           logger.info(`Node '${args.where.id}' power on strategy is configured as Always On (AO). Nothing to do.`);
           break;
 
@@ -502,7 +499,7 @@ public shutdown(args: ShutdownArgs, prismaTxn?: Prisma.TransactionClient) {
           throw new NodeError(`Node '${args.where.id}' has an unknown power on strategy '${node.powerOnStrategy}'.`);
       }
 
-      // Update
+      // Update node status
       await this.update(
         {
           where: { id: args.where.id },
@@ -606,5 +603,4 @@ public shutdown(args: ShutdownArgs, prismaTxn?: Prisma.TransactionClient) {
     logger.warn(`Node at ${address} did not go off after 2 minutes and is still reachable via ping.`);
     throw new NodeError(`Node at ${address} did not shut down within the expected time.`);
   }
-
 }

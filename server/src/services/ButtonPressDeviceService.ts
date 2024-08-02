@@ -8,7 +8,6 @@ export class ButtonPressDeviceService {
 
   // Public function to handle the power on logic of the BPD
   public async pressButton(address: string, nodeId: string): Promise<void>  {
-    //TODO: set the correct url for BPD API
     const url = `http://${address}/press`;
     logger.info(`Pressing button on button press device at ${address} for the node ${nodeId} successfully.`);
     try {
