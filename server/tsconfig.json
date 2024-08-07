@@ -27,6 +27,8 @@
       }
     ]
   },
-  "include": ["./src/**/*.ts"],
+  "include": ["./src/**/*.ts",
+              "./public/**/*.html"
+],
   "exclude": ["./node_modules/**/*", "./build/**/*"]
 }

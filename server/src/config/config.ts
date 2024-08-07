@@ -34,7 +34,8 @@ export const config: Config = {
   },
   server: {
     host: env.HOST,
-    port: env.PORT
+    port: env.PORT,
+    dashboardPort: env.DASHBOARD_PORT
   },
   logger: {
     level: env.LOGGER_LEVEL as pino.LevelWithSilent

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cluster Status</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <h1>Cluster Status</h1>
+    <table id="nodesTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Status</th>
+                <th>IP Address</th>
+                <th>Roles</th>
+                <th>Power Strategy</th>
+                <th>Power On Device</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Nodes data will be inserted here -->
+        </tbody>
+    </table>
+
+    <script>
+        async function fetchNodes() {
+            try {
+                const response = await fetch('/api/nodes');
+                const data = await response.json();
+                const tbody = document.getElementById('nodesTable').querySelector('tbody');
+                tbody.innerHTML = '';
+
+                data.nodes.forEach(node => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${node.id}</td>
+                        <td>${node.name}</td>
+                        <td>${node.status.status}</td>
+                        <td>${node.address}</td>
+                        <td>${node.roles.join(', ')}</td>
+                        <td>${node.powerOnStrategy}</td>
+                        <td>${node.powerOnDevice ? node.powerOnDevice.address + ' (' + node.powerOnDevice.deviceType + ')' : 'N/A'}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Error fetching nodes:', error);
+            }
+        }
+
+        // Fetch nodes when the page loads
+        window.onload = fetchNodes;
+    </script>
+</body>
+</html>

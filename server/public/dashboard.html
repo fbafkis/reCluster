@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>reCluster Status Dashboard </title>
+    <h3>The dashboard is updated every 10 seconds</h3>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .highlight {
+            background-color: #ffffcc;
+        }
+        .indent {
+            padding-left: 20px;
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <h1>Cluster Status</h1>
+    <table id="nodesTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Status</th>
+                <th>IP Address</th>
+                <th>Roles</th>
+                <th>Power Strategy</th>
+                <th>Power On Device</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Nodes data will be inserted here -->
+        </tbody>
+    </table>
+
+    <script>
+        async function fetchNodes() {
+            try {
+                const response = await fetch('/api/nodes');
+                const data = await response.json();
+                const tbody = document.getElementById('nodesTable').querySelector('tbody');
+                tbody.innerHTML = '';
+
+                // Sort nodes so the RECLUSTER_CONTROLLER is first
+                data.nodes.sort((a, b) => b.roles.includes('RECLUSTER_CONTROLLER') - a.roles.includes('RECLUSTER_CONTROLLER'));
+
+                data.nodes.forEach(node => {
+                    const nodeRow = document.createElement('tr');
+                    nodeRow.innerHTML = `
+                        <td>${node.id}</td>
+                        <td>${node.name}</td>
+                        <td>${node.status.status}</td>
+                        <td>${node.address}</td>
+                        <td>${node.roles.join(', ')}</td>
+                        <td>${node.powerOnStrategy}</td>
+                        <td>${node.powerOnDevice ? node.powerOnDevice.address + ' (' + node.powerOnDevice.deviceType + ')' : 'N/A'}</td>
+                    `;
+                    if (node.roles.includes('RECLUSTER_CONTROLLER')) {
+                        nodeRow.classList.add('highlight');
+                    }
+                    tbody.appendChild(nodeRow);
+
+                    // Add interfaces
+                    if (node.interfaces) {
+                        node.interfaces.forEach(intf => {
+                            const interfaceRow = document.createElement('tr');
+                            interfaceRow.classList.add('indent');
+                            interfaceRow.innerHTML = `
+                                <td colspan="2">Interface: ${intf.name}</td>
+                                <td colspan="2">IP: ${intf.address}</td>
+                                <td>Speed: ${intf.speed}</td>
+                                <td>WoL: ${intf.wol.join(', ')}</td>
+                                <td>Controller: ${intf.controller}</td>
+                            `;
+                            tbody.appendChild(interfaceRow);
+                        });
+                    }
+
+                    // Add power on device
+                    if (node.powerOnDevice) {
+                        const powerOnDeviceRow = document.createElement('tr');
+                        powerOnDeviceRow.classList.add('indent');
+                        powerOnDeviceRow.innerHTML = `
+                            <td colspan="2">Power On Device:</td>
+                            <td colspan="2">IP: ${node.powerOnDevice.address}</td>
+                            <td colspan="3">Type: ${node.powerOnDevice.deviceType}</td>
+                        `;
+                        tbody.appendChild(powerOnDeviceRow);
+                    }
+                });
+            } catch (error) {
+                console.error('Error fetching nodes:', error);
+            }
+        }
+
+        // Fetch nodes when the page loads
+        window.onload = () => {
+            fetchNodes();
+            setInterval(fetchNodes, 10000); // Refresh every 10 seconds
+        };
+    </script>
+</body>
+</html>

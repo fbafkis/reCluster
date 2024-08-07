@@ -33,6 +33,7 @@ export type Config = {
   server: {
     host: string;
     port: number;
+    dashboardPort: number;
   };
   logger: {
     level: pino.LevelWithSilent;

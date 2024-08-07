@@ -1,26 +1,3 @@
-/*
- * MIT License
- *
- * Copyright (c) 2022-2023 Carlo Corradini
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
 
 /* ! Always on top ! */
 import 'reflect-metadata';
@@ -38,6 +15,7 @@ import fastifyApollo, {
   fastifyApolloDrainPlugin
 } from '@as-integrations/fastify';
 import { ApolloServer } from '@apollo/server';
+import express from 'express';
 import { logger } from './logger';
 import { context, formatError } from './helpers';
 import { config } from './config';
@@ -45,6 +23,8 @@ import { prisma } from './db';
 import { schema } from './graphql';
 import { kubeconfig, NodeInformer } from './k8s';
 import { Context } from './types';
+import webApp from './services/webServer/webServer';
+import { createServer } from 'http';
 
 // Set timezone to UTC
 process.env.TZ = 'Etc/UTC';
@@ -57,6 +37,33 @@ const apollo = new ApolloServer<Context>({
   formatError,
   plugins: [fastifyApolloDrainPlugin(server)]
 });
+
+// Dashboard server configuration
+const dashboardPort = config.server.dashboardPort || 3000;
+let dashboardServer: ReturnType<typeof createServer>;
+
+// Dashboard server starting function
+const startWebServer = (app: express.Express, port: number, name: string) => {
+  const server = createServer(app);
+
+  server.listen(port);
+
+  server.on('listening', () => {
+    logger.info(`${name} is running on http://localhost:${port}`);
+  });
+
+  server.on('error', (err) => {
+    const error = err as { code?: string };
+    if (error.code === 'EADDRINUSE') {
+      logger.error(`Port ${port} is already in use. Trying another port...`);
+      startWebServer(app, port + 1, name);
+    } else {
+      logger.error(`Error starting server: ${error}`);
+    }
+  });
+
+  dashboardServer = server;
+};
 
 async function main() {
   // Database
@@ -90,8 +97,12 @@ async function main() {
     host: config.server.host
   });
   logger.info(`Server started at ${url}`);
+
+  // Starting dashboard web server
+  startWebServer(webApp, dashboardPort, 'Web server for the web dashboard');
 }
 
+// Terminator function
 async function terminate(signal: NodeJS.Signals) {
   logger.warn(`Received '${signal}' signal`);
 
@@ -103,10 +114,16 @@ async function terminate(signal: NodeJS.Signals) {
   await apollo.stop();
   // Server
   await server.close();
+
+  if (dashboardServer) {
+    dashboardServer.close(() => {
+      logger.info('Web server for the web dashboard closed.');
+    });
+  }
 }
 
-process.on('SIGTERM', terminate);
-process.on('SIGINT', terminate);
+process.on('SIGTERM', () => terminate('SIGTERM'));
+process.on('SIGINT', () => terminate('SIGINT'));
 
 main().catch((error) => {
   logger.fatal(error instanceof Error ? error.message : error);

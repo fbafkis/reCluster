@@ -190,7 +190,13 @@ public create(args: CreateArgs, prismaTxn?: Prisma.TransactionClient) {
 
     return prismaTxn.node.findMany({
       ...args,
-      cursor: args.cursor ? { id: args.cursor } : undefined
+      cursor: args.cursor ? { id: args.cursor } : undefined,
+      // Retrieve the additional information needed for the dashboard
+      include: {
+        status: true,
+        powerOnDevice: true,
+        interfaces: true
+      }
     });
   }
 

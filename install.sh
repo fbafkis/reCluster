@@ -1816,7 +1816,7 @@ select_interface() {
   done
 
   # Build the whiptail command for the radio list
-  whiptail_command="whiptail --radiolist \"Choose a network interface\" 20 100 10 $whiptail_args 3>&1 1>&2 2>&3"
+  whiptail_command="whiptail --radiolist \"Choose a controller network interface\" 20 100 10 $whiptail_args 3>&1 1>&2 2>&3"
 
   selected_interface=$(sh -c "$whiptail_command")
 
@@ -2979,7 +2979,7 @@ configure_power_on_strategy() {
 
   DEBUG "$_valid_interfaces"
 
-  if [ "$INIT_CLUSTER" = true ]; then
+  if [ "$INIT_CLUSTER" = false ]; then
     whiptail --title "Power on strategy configuration" --infobox "Now it's time to select the desired power on strategy." 12 78
     INFO "Power on strategy configuration."
 

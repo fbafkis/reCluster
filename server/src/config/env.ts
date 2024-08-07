@@ -37,6 +37,7 @@ export const env = cleanEnv(process.env, {
   }),
   HOST: host({ default: '0.0.0.0', desc: 'Server host' }),
   PORT: port({ default: 80, desc: 'Server port' }),
+  DASHBOARD_PORT: port({default: 3000, desc: 'Web dashboard port' }),
   LOGGER_LEVEL: str({
     choices: ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'],
     default: 'info',
