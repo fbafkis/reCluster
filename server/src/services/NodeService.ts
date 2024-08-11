@@ -42,10 +42,9 @@ import { NodePoolService } from './NodePoolService';
 import { StatusService } from './StatusService';
 import { K8sService } from './K8sService';
 import { WoLService } from './WoLService';
-import {SmartPlugService} from './SmartPlugService'
-import {ButtonPressDeviceService} from './ButtonPressDeviceService'
+import { SmartPlugService } from './SmartPlugService';
+import { ButtonPressDeviceService } from './ButtonPressDeviceService';
 import { exec } from 'child_process';
-
 
 type CreateArgs = Omit<Prisma.NodeCreateArgs, 'include' | 'data'> & {
   data: CreateNodeInput;
@@ -99,88 +98,86 @@ export class NodeService {
     private readonly buttonPressDeviceService: ButtonPressDeviceService
   ) {}
 
-public create(args: CreateArgs, prismaTxn?: Prisma.TransactionClient) {
-  // eslint-disable-next-line @typescript-eslint/no-shadow
-  const fn = async (prisma: Prisma.TransactionClient) => {
+  public create(args: CreateArgs, prismaTxn?: Prisma.TransactionClient) {
+    // eslint-disable-next-line @typescript-eslint/no-shadow
+    const fn = async (prisma: Prisma.TransactionClient) => {
       logger.info(`Node service create: ${JSON.stringify(args)}`);
 
       // Create or update cpu
       const { id: cpuId } = await this.cpuService.upsert(
-          {
-              data: args.data.cpu,
-              select: { id: true }
-          },
-          prisma
+        {
+          data: args.data.cpu,
+          select: { id: true }
+        },
+        prisma
       );
 
       // Create or update node pool
       const { id: nodePoolId } = await this.nodePoolService.upsert(
-          {
-              data: {
-                  cpu: args.data.cpu.cores,
-                  memory: args.data.memory,
-                  roles: args.data.roles
-              },
-              select: { id: true }
+        {
+          data: {
+            cpu: args.data.cpu.cores,
+            memory: args.data.memory,
+            roles: args.data.roles
           },
-          prisma
+          select: { id: true }
+        },
+        prisma
       );
 
       // Prepare powerOnDevice data if strategy is not WOL or AO
       let powerOnDeviceData: any = undefined;
       if (args.data.powerOnDevice && args.data.powerOnStrategy !== "WOL" && args.data.powerOnStrategy !== "AO") {
-          powerOnDeviceData = { create: args.data.powerOnDevice };
+        powerOnDeviceData = { create: args.data.powerOnDevice };
       }
 
       // Create the node
       const { id, roles } = await prisma.node.create({
-          ...args,
-          select: { id: true, roles: true },
-          data: {
-              ...args.data,
-              name: `dummy.${args.data.address}`,
-              status: {
-                  create: {
-                      status: NodeStatusEnum.ACTIVE,
-                      reason: 'NodeRegistered',
-                      message: 'Node registered',
-                      lastHeartbeat: new Date(),
-                      lastTransition: new Date()
-                  }
-              },
-              nodePool: { connect: { id: nodePoolId } },
-              cpu: { connect: { id: cpuId } },
-              storages: { createMany: { data: args.data.storages } },
-              interfaces: {
-                  createMany: { data: args.data.interfaces }
-              },
-              powerOnDevice: powerOnDeviceData
-          }
+        ...args,
+        data: {
+          ...args.data,
+          name: `dummy.${args.data.address}`,
+          status: {
+            create: {
+              status: NodeStatusEnum.ACTIVE,
+              reason: 'NodeRegistered',
+              message: 'Node registered',
+              lastHeartbeat: new Date(),
+              lastTransition: new Date()
+            }
+          },
+          nodePool: { connect: { id: nodePoolId } },
+          cpu: { connect: { id: cpuId } },
+          storages: { createMany: { data: args.data.storages } },
+          interfaces: {
+            createMany: { data: args.data.interfaces }
+          },
+          powerOnDevice: powerOnDeviceData
+        }
       });
 
       // Update node name
       const node = await this.update(
-          {
-              where: { id },
-              select: { id: true, roles: true, permissions: true },
-              data: {
-                  name: `${isControllerNode(roles) ? 'controller' : 'worker'}.${id}`
-              }
-          },
-          prisma
+        {
+          where: { id },
+          data: {
+            name: `${isControllerNode(roles) ? 'controller' : 'worker'}.${id}`
+          }
+        },
+        prisma
       );
 
       // Generate token
       return this.tokenService.sign({
-          type: TokenTypes.NODE,
-          id: node.id,
-          roles: node.roles,
-          permissions: node.permissions
+        type: TokenTypes.NODE,
+        id: node.id,
+        roles: node.roles,
+        permissions: node.permissions
       });
-  };
+    };
 
-  return prismaTxn ? fn(prismaTxn) : prisma.$transaction(fn);
-}
+    return prismaTxn ? fn(prismaTxn) : prisma.$transaction(fn);
+  }
 
   public findMany(
     args: FindManyArgs,
@@ -190,8 +187,18 @@ public create(args: CreateArgs, prismaTxn?: Prisma.TransactionClient) {
 
     return prismaTxn.node.findMany({
       ...args,
-      cursor: args.cursor ? { id: args.cursor } : undefined,
-      // Retrieve the additional information needed for the dashboard
+      cursor: args.cursor ? { id: args.cursor } : undefined
+    });
+  }
+
+  public findUnique(
+    args: FindUniqueArgs,
+    prismaTxn: Prisma.TransactionClient = prisma
+  ) {
+    logger.info(`Node service find unique: ${JSON.stringify(args)}`);
+
+    return prismaTxn.node.findUnique({
+      ...args,
       include: {
         status: true,
         powerOnDevice: true,
@@ -200,23 +207,57 @@ public create(args: CreateArgs, prismaTxn?: Prisma.TransactionClient) {
     });
   }
 
-  public findUnique(
-    args: FindUniqueArgs,
-    prismaTxn: Prisma.TransactionClient = prisma
-  ) {
-    logger.debug(`Node service find unique: ${JSON.stringify(args)}`);
+  // public findUniqueOrThrow<T extends Prisma.NodeFindUniqueOrThrowArgs>(
+  //   args: Prisma.SelectSubset<T, FindUniqueOrThrowArgs>,
+  //   prismaTxn: Prisma.TransactionClient = prisma
+  // ): Prisma.Prisma__NodeClient<Prisma.NodeGetPayload<T>> {
+  //   logger.debug(`Node service find unique or throw: ${JSON.stringify(args)}`);
 
-    return prismaTxn.node.findUnique(args);
-  }
+  //   return prismaTxn.node.findUniqueOrThrow({
+  //     ...args,
+  //     include: {
+  //       status: true,
+  //       powerOnDevice: true,
+  //       interfaces: true
+  //     }
+  //   });
+  // }
 
   public findUniqueOrThrow<T extends Prisma.NodeFindUniqueOrThrowArgs>(
     args: Prisma.SelectSubset<T, FindUniqueOrThrowArgs>,
     prismaTxn: Prisma.TransactionClient = prisma
   ): Prisma.Prisma__NodeClient<Prisma.NodeGetPayload<T>> {
-    logger.debug(`Node service find unique or throw: ${JSON.stringify(args)}`);
+    logger.info(`Node service find unique or throw: ${JSON.stringify(args)}`);
 
-    return prismaTxn.node.findUniqueOrThrow(args);
+    const include = {
+      status: true,
+      powerOnDevice: true,
+      interfaces: true
+    };
+
+    // Check if args already contains `select` or `include`
+    if ('select' in args) {
+      // If `select` is used, do not add `include`
+      return prismaTxn.node.findUniqueOrThrow(args);
+    } else if ('include' in args) {
+      // Merge existing `include` with predefined `include` if `args.include` is defined
+      return prismaTxn.node.findUniqueOrThrow({
+        ...args,
+        include: {
+          ...include,
+          ...(args.include ?? {}) // Use empty object if args.include is undefined
+        }
+      });
+    } else {
+      // Add `include` if neither `select` nor `include` are used
+      return prismaTxn.node.findUniqueOrThrow({
+        ...args,
+        include
+      });
+    }
   }
+
+
 
   public update(args: UpdateArgs, prismaTxn?: Prisma.TransactionClient) {
     // eslint-disable-next-line @typescript-eslint/no-shadow
@@ -291,50 +332,6 @@ public create(args: CreateArgs, prismaTxn?: Prisma.TransactionClient) {
 
     return prismaTxn ? fn(prismaTxn) : prisma.$transaction(fn);
   }
-
-  // public shutdown(args: ShutdownArgs, prismaTxn?: Prisma.TransactionClient) {
-  //   // eslint-disable-next-line @typescript-eslint/no-shadow
-  //   const fn = async (prisma: Prisma.TransactionClient) => {
-  //     logger.info(`Node service shutdown: ${JSON.stringify(args)}`);
-
-  //     // Check if node exists and not assigned to node pool
-  //     const node = await this.findUniqueOrThrow(
-  //       {
-  //         where: { id: args.where.id },
-  //         select: { nodePoolId: true, nodePoolAssigned: true, address: true }
-  //       },
-  //       prisma
-  //     );
-  //     if (node.nodePoolAssigned)
-  //       throw new NodeError(
-  //         `Node '${args.where.id}' is assigned to node pool ${node.nodePoolId}`
-  //       );
-
-  //     // Shutdown
-  //     const ssh = await SSH.connect({ host: node.address });
-  //     await ssh.execCommand({
-  //       command: 'sudo poweroff',
-  //       disconnect: true
-  //     });
-
-  //     // Update
-  //     await this.update(
-  //       {
-  //         where: { id: args.where.id },
-  //         data: {
-  //           status: {
-  //             status: NodeStatusEnum.INACTIVE,
-  //             reason: args.status?.reason ?? 'NodeShutdown',
-  //             message: args.status?.message ?? 'Node shutdown'
-  //           }
-  //         }
-  //       },
-  //       prisma
-  //     );
-  //   };
-
-  //   return prismaTxn ? fn(prismaTxn) : prisma.$transaction(fn);
-  // }
 
   public shutdown(args: ShutdownArgs, prismaTxn?: Prisma.TransactionClient) {
     // eslint-disable-next-line @typescript-eslint/no-shadow
@@ -525,67 +522,7 @@ public create(args: CreateArgs, prismaTxn?: Prisma.TransactionClient) {
     return prismaTxn ? fn(prismaTxn) : prisma.$transaction(fn);
   }
 
-  // public boot(args: BootArgs, prismaTxn?: Prisma.TransactionClient) {
-  //   // eslint-disable-next-line @typescript-eslint/no-shadow
-  //   const fn = async (prisma: Prisma.TransactionClient) => {
-  //     logger.info(`Node service boot: ${JSON.stringify(args)}`);
-
-  //     // Check if node exists and not assigned to node pool
-  //     const node = await this.findUniqueOrThrow(
-  //       {
-  //         where: { id: args.where.id },
-  //         select: {
-  //           nodePoolId: true,
-  //           nodePoolAssigned: true,
-  //           address: process.platform === 'win32',
-  //           interfaces: {
-  //             where: { wol: { isEmpty: false } },
-  //             select: { address: true }
-  //           }
-  //         }
-  //       },
-  //       prisma
-  //     );
-  //     if (node.nodePoolAssigned)
-  //       throw new NodeError(
-  //         `Node '${args.where.id}' is assigned to node pool ${node.nodePoolId}`
-  //       );
-  //     if (node.interfaces.length === 0)
-  //       throw new NodeError(`Node '${args.where.id}' has no WoL interfaces`);
-
-  //     // Bootstrap
-  //     await Promise.any(
-  //       node.interfaces.map((intf) =>
-  //         this.wolService.wake({
-  //           mac: intf.address,
-  //           opts: {
-  //             ...(process.platform === 'win32' && { address: node.address })
-  //           }
-  //         })
-  //       )
-  //     );
-
-  //     // Update
-  //     await this.update(
-  //       {
-  //         where: { id: args.where.id },
-  //         data: {
-  //           nodePoolAssigned: true,
-  //           status: {
-  //             status: NodeStatusEnum.BOOTING,
-  //             reason: args.status?.reason ?? 'NodeBoot',
-  //             message: args.status?.message ?? 'Node boot'
-  //           }
-  //         }
-  //       },
-  //       prisma
-  //     );
-  //   };
-
-  //   return prismaTxn ? fn(prismaTxn) : prisma.$transaction(fn);
-  // }
-
- // Aux method to wait for node to be off and check ping reachabilitry
+  // Aux method to wait for node to be off and check ping reachability
   private async waitForNodeToBeOff(address: string): Promise<void> {
     const pingNode = (): Promise<boolean> => {
       return new Promise((resolve) => {

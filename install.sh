@@ -2579,7 +2579,7 @@ verify_system() {
   assert_cmd grep
   assert_cmd id
   assert_cmd ip
-  assert_cmd iputils
+  #assert_cmd iputils
   assert_cmd jq
   assert_cmd lscpu
   assert_cmd lsblk
@@ -2589,7 +2589,6 @@ verify_system() {
   assert_cmd sed
   assert_cmd ssh-keygen
   assert_cmd sudo
-  #assert_cmd sysbench
   check_sysbench
   assert_cmd tar
   assert_cmd tee

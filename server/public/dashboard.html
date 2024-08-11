@@ -3,15 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>reCluster Status Dashboard </title>
-    <h3>The dashboard is updated every 10 seconds</h3>
+    <title>Cluster Status</title>
     <style>
         body {
             font-family: Arial, sans-serif;
         }
-        table {
+        .container {
+            margin: 0 auto;
+            width: 80%;
+        }
+        .node-block {
+            margin-bottom: 30px;
+            border-top: 3px solid #333; /* Thicker and darker line */
+            padding-top: 20px;
+        }
+        .node-table, .interface-table, .poweron-table {
             width: 100%;
             border-collapse: collapse;
+            margin: 0;
         }
         th, td {
             border: 1px solid #ddd;
@@ -23,43 +32,77 @@
         .highlight {
             background-color: #ffffcc;
         }
-        .indent {
-            padding-left: 20px;
-            background-color: #f9f9f9;
+        .title {
+            font-weight: bold;
+            margin: 10px 0 5px;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            vertical-align: middle;
+            margin-left: 10px;
+        }
+        .status-text {
+            display: inline-block;
+            margin-left: 10px;
         }
     </style>
 </head>
 <body>
-    <h1>Cluster Status</h1>
-    <table id="nodesTable">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Status</th>
-                <th>IP Address</th>
-                <th>Roles</th>
-                <th>Power Strategy</th>
-                <th>Power On Device</th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- Nodes data will be inserted here -->
-        </tbody>
-    </table>
+    <div class="container">
+        <h1>reCluster Nodes Dashboard</h1>
+        <h2>Refreshing status:
+            <div class="status-indicator" id="statusIndicator"></div>
+            <span class="status-text" id="statusText">Failed</span>
+        </h2>
+        <div id="nodesContainer"></div>
+    </div>
 
     <script>
+        let lastRefreshTime = 0;
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+
         async function fetchNodes() {
             try {
                 const response = await fetch('/api/nodes');
                 const data = await response.json();
-                const tbody = document.getElementById('nodesTable').querySelector('tbody');
-                tbody.innerHTML = '';
+                const container = document.getElementById('nodesContainer');
+                container.innerHTML = '';
 
                 // Sort nodes so the RECLUSTER_CONTROLLER is first
                 data.nodes.sort((a, b) => b.roles.includes('RECLUSTER_CONTROLLER') - a.roles.includes('RECLUSTER_CONTROLLER'));
 
                 data.nodes.forEach(node => {
+                    const nodeBlock = document.createElement('div');
+                    nodeBlock.classList.add('node-block');
+
+                    // Node title
+                    const nodeTitle = document.createElement('div');
+                    nodeTitle.classList.add('title');
+                    nodeTitle.innerText = 'Node';
+                    nodeBlock.appendChild(nodeTitle);
+
+                    // Node table
+                    const nodeTable = document.createElement('table');
+                    nodeTable.classList.add('node-table');
+                    const nodeHeader = document.createElement('thead');
+                    nodeHeader.innerHTML = `
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Status</th>
+                            <th>IP Address</th>
+                            <th>Roles</th>
+                            <th>Power Strategy</th>
+                            <th>Power On Device</th>
+                        </tr>
+                    `;
+                    nodeTable.appendChild(nodeHeader);
+
+                    const nodeBody = document.createElement('tbody');
                     const nodeRow = document.createElement('tr');
                     nodeRow.innerHTML = `
                         <td>${node.id}</td>
@@ -73,38 +116,98 @@
                     if (node.roles.includes('RECLUSTER_CONTROLLER')) {
                         nodeRow.classList.add('highlight');
                     }
-                    tbody.appendChild(nodeRow);
+                    nodeBody.appendChild(nodeRow);
+                    nodeTable.appendChild(nodeBody);
+                    nodeBlock.appendChild(nodeTable);
 
-                    // Add interfaces
-                    if (node.interfaces) {
+                    // Interfaces title
+                    if (node.interfaces && node.interfaces.length > 0) {
+                        const interfaceTitle = document.createElement('div');
+                        interfaceTitle.classList.add('title');
+                        interfaceTitle.innerText = 'Interfaces';
+                        nodeBlock.appendChild(interfaceTitle);
+
+                        // Interfaces table
+                        const interfaceTable = document.createElement('table');
+                        interfaceTable.classList.add('interface-table');
+                        const interfaceHeader = document.createElement('thead');
+                        interfaceHeader.innerHTML = `
+                            <tr>
+                                <th>Name</th>
+                                <th>MAC Address</th>
+                                <th>Speed</th>
+                                <th>WoL</th>
+                                <th>Controller</th>
+                            </tr>
+                        `;
+                        interfaceTable.appendChild(interfaceHeader);
+
+                        const interfaceBody = document.createElement('tbody');
                         node.interfaces.forEach(intf => {
                             const interfaceRow = document.createElement('tr');
-                            interfaceRow.classList.add('indent');
                             interfaceRow.innerHTML = `
-                                <td colspan="2">Interface: ${intf.name}</td>
-                                <td colspan="2">IP: ${intf.address}</td>
-                                <td>Speed: ${intf.speed}</td>
-                                <td>WoL: ${intf.wol.join(', ')}</td>
-                                <td>Controller: ${intf.controller}</td>
+                                <td>${intf.name}</td>
+                                <td>${intf.address}</td>
+                                <td>${intf.speed}</td>
+                                <td>${intf.wol.join(', ')}</td>
+                                <td>${intf.controller}</td>
                             `;
-                            tbody.appendChild(interfaceRow);
+                            interfaceBody.appendChild(interfaceRow);
                         });
+                        interfaceTable.appendChild(interfaceBody);
+                        nodeBlock.appendChild(interfaceTable);
                     }
 
-                    // Add power on device
+                    // Power On Device title
                     if (node.powerOnDevice) {
-                        const powerOnDeviceRow = document.createElement('tr');
-                        powerOnDeviceRow.classList.add('indent');
-                        powerOnDeviceRow.innerHTML = `
-                            <td colspan="2">Power On Device:</td>
-                            <td colspan="2">IP: ${node.powerOnDevice.address}</td>
-                            <td colspan="3">Type: ${node.powerOnDevice.deviceType}</td>
+                        const powerOnTitle = document.createElement('div');
+                        powerOnTitle.classList.add('title');
+                        powerOnTitle.innerText = 'Power On Devices';
+                        nodeBlock.appendChild(powerOnTitle);
+
+                        // Power On Device table
+                        const powerOnTable = document.createElement('table');
+                        powerOnTable.classList.add('poweron-table');
+                        const powerOnHeader = document.createElement('thead');
+                        powerOnHeader.innerHTML = `
+                            <tr>
+                                <th>IP Address</th>
+                                <th>Type</th>
+                            </tr>
                         `;
-                        tbody.appendChild(powerOnDeviceRow);
+                        powerOnTable.appendChild(powerOnHeader);
+
+                        const powerOnBody = document.createElement('tbody');
+                        const powerOnRow = document.createElement('tr');
+                        powerOnRow.innerHTML = `
+                            <td>${node.powerOnDevice.address}</td>
+                            <td>${node.powerOnDevice.deviceType}</td>
+                        `;
+                        powerOnBody.appendChild(powerOnRow);
+                        powerOnTable.appendChild(powerOnBody);
+                        nodeBlock.appendChild(powerOnTable);
                     }
+
+                    container.appendChild(nodeBlock);
                 });
+
+                // Update the last refresh time
+                lastRefreshTime = Date.now();
+                updateStatusIndicator();
             } catch (error) {
                 console.error('Error fetching nodes:', error);
+                updateStatusIndicator(true); // Update the status indicator to show error
+            }
+        }
+
+        function updateStatusIndicator(error = false) {
+            const currentTime = Date.now();
+            if (error || (currentTime - lastRefreshTime) > 11000) { // 11 seconds
+                statusIndicator.style.backgroundColor = 'red';
+                statusText.innerText = 'Failed';
+            } else {
+                statusIndicator.style.backgroundColor = 'green';
+                statusText.innerText = 'OK';
             }
         }
 
@@ -112,6 +215,7 @@
         window.onload = () => {
             fetchNodes();
             setInterval(fetchNodes, 10000); // Refresh every 10 seconds
+            setInterval(updateStatusIndicator, 1000); // Check the status indicator every second
         };
     </script>
 </body>
