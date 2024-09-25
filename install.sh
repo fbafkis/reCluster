@@ -609,7 +609,7 @@ RECLUSTER_SERVER_ENV_FILE="configs/recluster/server.env"
 # SSH authorized keys file
 SSH_AUTHORIZED_KEYS_FILE="configs/ssh/authorized_keys"
 # SSH configuration file
-SSH_CONFIG_FILE=
+SSH_CONFIG_FILE="configs/ssh/ssh_config"
 # SSH server configuration file
 SSHD_CONFIG_FILE="configs/ssh/sshd_config"
 # User
@@ -2540,6 +2540,28 @@ parse_args() {
 
 # Verify system
 verify_system() {
+
+  # Function to check already existing directories from old installations
+
+  check_directories() {
+    if [ -d "$RECLUSTER_ETC_DIR" ] || [ -d "$RECLUSTER_OPT_DIR" ]; then
+      # Use whiptail to ask the user
+      if whiptail --title "Directories Exist" --yesno "Directories '$RECLUSTER_ETC_DIR' and/or '$RECLUSTER_OPT_DIR' already exist. Do you want to run 'recluster.uninstall.sh' to remove them and retry?" 10 80; then
+        # User agreed to uninstall, run the uninstall script
+        INFO "Running uninstall script 'recluster.uninstall.sh'..."
+        recluster.uninstall.sh || FATAL "Failed to run 'recluster.uninstall.sh'."
+
+        # Retry the directory check after uninstall
+        if [ -d "$RECLUSTER_ETC_DIR" ] || [ -d "$RECLUSTER_OPT_DIR" ]; then
+          FATAL "Directories still exist after running uninstall script."
+        fi
+      else
+        # User chose not to uninstall, exit with a fatal error
+        FATAL "Directories '$RECLUSTER_ETC_DIR' and/or '$RECLUSTER_OPT_DIR' already exist, and the user opted not to remove them."
+      fi
+    fi
+  }
+
   # Architecture
   ARCH=$(uname -m)
   case $ARCH in
@@ -2553,6 +2575,7 @@ verify_system() {
   esac
 
   # Commands
+  check_directories
   assert_cmd bc
   assert_cmd cp
   assert_cmd cut
@@ -2598,9 +2621,6 @@ verify_system() {
   # Check power consumption device reachability
   assert_url_reachability "$PC_DEVICE_API"
 
-  # Directories
-  [ ! -d "$RECLUSTER_ETC_DIR" ] || FATAL "Directory '$RECLUSTER_ETC_DIR' already exists"
-  [ ! -d "$RECLUSTER_OPT_DIR" ] || FATAL "Directory '$RECLUSTER_OPT_DIR' already exists"
   # Certificates
   [ -d "$RECLUSTER_CERTS_DIR" ] || FATAL "Certificates directory '$RECLUSTER_CERTS_DIR' does not exists"
 
