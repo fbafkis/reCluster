@@ -555,7 +555,7 @@ Options commons:
 EOF
 )
 # Log level
-LOG_LEVEL=
+LOG_LEVEL=$LOG_LEVEL_INFO
 # Log color flag
 LOG_COLOR_ENABLE=true
 
@@ -565,23 +565,23 @@ LOG_COLOR_ENABLE=true
 # Admin username
 ADMIN_USERNAME="admin"
 # Admin password
-ADMIN_PASSWORD=
+ADMIN_PASSWORD="Password\$0"
 # Airgap environment flag
 AIRGAP_ENV=false
 # Autoscaler username
 AUTOSCALER_USERNAME="autoscaler"
 # Autoscaler password
-AUTOSCALER_PASSWORD=
+AUTOSCALER_PASSWORD="Password\$0"
 # Autoscaler version
 AUTOSCALER_VERSION=latest
 # Benchmark time in seconds
 BENCH_TIME=30
 # Configuration file
-CONFIG_FILE=
+CONFIG_FILE="configs/recluster/config.yaml"
 # Initialize cluster
-INIT_CLUSTER=
+INIT_CLUSTER=false
 # K3s configuration file
-K3S_CONFIG_FILE=
+K3S_CONFIG_FILE="configs/k3s/config.yaml"
 # K3s registry configuration file
 K3S_REGISTRY_CONFIG_FILE="configs/k3s/registries.yaml"
 # K3s version
@@ -591,7 +591,7 @@ NODE_EXPORTER_CONFIG_FILE="configs/node_exporter/config.yaml"
 # Node exporter version
 NODE_EXPORTER_VERSION=latest
 # Power consumption device api url
-PC_DEVICE_API=
+PC_DEVICE_API="http://pc.recluster.local/cm?cmnd=status%2010"
 # Power consumption interval in seconds
 PC_INTERVAL=1
 # Power consumption time in seconds
@@ -609,7 +609,7 @@ RECLUSTER_SERVER_ENV_FILE="configs/recluster/server.env"
 # SSH authorized keys file
 SSH_AUTHORIZED_KEYS_FILE="configs/ssh/authorized_keys"
 # SSH configuration file
-SSH_CONFIG_FILE=
+SSH_CONFIG_FILE="configs/ssh/ssh_config"
 # SSH server configuration file
 SSHD_CONFIG_FILE="configs/ssh/sshd_config"
 # User
@@ -2219,86 +2219,7 @@ node_registration() {
 
 # Parse command line arguments
 # @param $@ Arguments
-
 parse_args() {
-
-  # Utility functions for validation
-  validate_ip() {
-    local ip="$1"
-
-    # Use regex pattern for IP address (must use POSIX-compliant syntax for sh)
-    # Checks the format X.X.X.X where each X is a number between 0 and 255
-    if echo "$ip" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
-      # Validate each octet
-      set -- $(echo "$ip" | tr '.' ' ')
-      if [ "$1" -ge 0 ] && [ "$1" -le 255 ] &&
-        [ "$2" -ge 0 ] && [ "$2" -le 255 ] &&
-        [ "$3" -ge 0 ] && [ "$3" -le 255 ] &&
-        [ "$4" -ge 0 ] && [ "$4" -le 255 ]; then
-        return 0 # IP is valid
-      fi
-    fi
-
-    # If we reach here, the IP is invalid
-    whiptail --msgbox "Invalid IP address. Please enter a valid IP address (format: X.X.X.X, each X between 0-255)." 8 78 --title "Invalid IP Address"
-    return 1
-  }
-
-  validate_non_empty() {
-    local input="$1"
-    local message="$2"
-    while [ -z "$input" ]; do
-      input=$(whiptail --inputbox "$message" 8 78 --title "Required Parameter" 3>&1 1>&2 2>&3)
-      [ $? -eq 0 ] || exit 1 # Exit if the user cancels
-    done
-    echo "$input"
-  }
-
-  validate_path() {
-    local path="$1"
-    if [ ! -f "$path" ]; then
-      whiptail --msgbox "Insert a valid file path." 8 78 --title "Invalid Path"
-      return 1
-    fi
-    return 0
-  }
-
-  build_device_api_url() {
-    local ip="$1"
-    PC_DEVICE_API="http://$ip/cm?cmnd=status%2010"
-  }
-
-  select_log_level() {
-    local selection=""
-    while [ -z "$selection" ]; do
-      selection=$(whiptail --radiolist "Choose a log level:" 15 50 5 \
-        "fatal" "Only fatal errors are shown" OFF \
-        "error" "Only error messages are shown" OFF \
-        "warn" "Warnings and errors are shown" OFF \
-        "info" "Normal information is shown" ON \
-        "debug" "All debug information is shown" OFF \
-        --nocancel 3>&1 1>&2 2>&3)
-
-      # Check if whiptail exited with a proper selection
-      if [ $? -eq 0 ] && [ -n "$selection" ]; then
-        case "$selection" in
-        "fatal") LOG_LEVEL=$LOG_LEVEL_FATAL ;;
-        "error") LOG_LEVEL=$LOG_LEVEL_ERROR ;;
-        "warn") LOG_LEVEL=$LOG_LEVEL_WARN ;;
-        "info") LOG_LEVEL=$LOG_LEVEL_INFO ;;
-        "debug") LOG_LEVEL=$LOG_LEVEL_DEBUG ;;
-        *)
-          whiptail --msgbox "You must select a valid log level." 8 51
-          selection="" # Reset selection to loop back
-          ;;
-        esac
-      else
-        whiptail --msgbox "An error occurred or no selection made. Please try again." 8 51
-        selection="" # Reset selection to loop back
-      fi
-    done
-  }
-
   while [ $# -gt 0 ]; do
     # Number of shift
     _shifts=1
@@ -2488,54 +2409,6 @@ parse_args() {
       _shifts=$((_shifts = _shifts - 1))
     done
   done
-
-  # Check for Missing Arguments and Validate Them
-
-  if [ -z "$LOG_LEVEL" ]; then
-    select_log_level
-  fi
-
-  if [ -z "$ADMIN_PASSWORD" ]; then
-    ADMIN_PASSWORD=$(validate_non_empty "$ADMIN_PASSWORD" "Enter the Admin password:")
-  fi
-
-  if [ -z "$AUTOSCALER_PASSWORD" ]; then
-    AUTOSCALER_PASSWORD=$(validate_non_empty "$AUTOSCALER_PASSWORD" "Enter the Autoscaler password:")
-  fi
-
-  if [ -z "$PC_DEVICE_API" ]; then
-    while [ -z "$PC_DEVICE_API" ]; do
-      ip=$(whiptail --inputbox "Enter the IP address for the PC Device API:" 8 78 --title "PC Device API IP" 3>&1 1>&2 2>&3)
-      [ $? -eq 0 ] || exit 1
-      if validate_ip "$ip"; then
-        build_device_api_url "$ip"
-      fi
-    done
-  fi
-
-  if [ -z "$CONFIG_FILE" ]; then
-    config_input=$(validate_non_empty "$CONFIG_FILE" "Enter the configuration file path:")
-    while ! validate_path "$config_input"; do
-      config_input=$(validate_non_empty "$CONFIG_FILE" "Enter a valid configuration file path:")
-    done
-    CONFIG_FILE="$config_input"
-  fi
-
-  if [ -z "$K3S_CONFIG_FILE" ]; then
-    k3s_input=$(validate_non_empty "$K3S_CONFIG_FILE" "Enter the K3S configuration file path:")
-    while ! validate_path "$k3s_input"; do
-      k3s_input=$(validate_non_empty "$K3S_CONFIG_FILE" "Enter a valid K3S configuration file path:")
-    done
-    K3S_CONFIG_FILE="$k3s_input"
-  fi
-
-  if [ -z "$INIT_CLUSTER" ]; then
-    if (whiptail --title "Initialize Cluster" --yesno "Do you want to initialize the cluster?" 8 78); then
-      INIT_CLUSTER=true
-    else
-      INIT_CLUSTER=false
-    fi
-  fi
 }
 
 # Verify system
