@@ -207,22 +207,6 @@ export class NodeService {
     });
   }
 
-  // public findUniqueOrThrow<T extends Prisma.NodeFindUniqueOrThrowArgs>(
-  //   args: Prisma.SelectSubset<T, FindUniqueOrThrowArgs>,
-  //   prismaTxn: Prisma.TransactionClient = prisma
-  // ): Prisma.Prisma__NodeClient<Prisma.NodeGetPayload<T>> {
-  //   logger.debug(`Node service find unique or throw: ${JSON.stringify(args)}`);
-
-  //   return prismaTxn.node.findUniqueOrThrow({
-  //     ...args,
-  //     include: {
-  //       status: true,
-  //       powerOnDevice: true,
-  //       interfaces: true
-  //     }
-  //   });
-  // }
-
   public findUniqueOrThrow<T extends Prisma.NodeFindUniqueOrThrowArgs>(
     args: Prisma.SelectSubset<T, FindUniqueOrThrowArgs>,
     prismaTxn: Prisma.TransactionClient = prisma

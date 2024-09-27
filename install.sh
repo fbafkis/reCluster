@@ -1184,6 +1184,54 @@ EOF
 
 }
 
+# Function to automatically download from the server and install the ssh certificate
+automatic_install_ssh_certificate() {
+  # Check if it's a controller node
+  if [ "$INIT_CLUSTER" = true ]; then
+    INFO "Since it is a controller, no automatic certificate installation is required."
+    return
+  fi
+
+  # Modify the $_server_url to remove the port, the /graphql, and the http:// prefix if necessary
+  clean_server_url=$(echo "$_server_url" | sed -e 's|http://||' -e 's|:[0-9]*/graphql$||')
+
+  # Ask the user if they want to automatically download and install the certificate
+  if whiptail --title "SSH Certificate Installation" --yesno "Do you want to automatically download and install the SSH certificate from the server?" 10 60; then
+    # Attempt to download the certificate using wget
+    INFO "Downloading SSH certificate from 'http://$clean_server_url:3000/api/getsshcertificate'"
+    cert_content=$(wget -qO- "http://$clean_server_url:3000/api/getsshcertificate")
+
+    # Check if the download was successful
+    if [ $? -eq 0 ] && [ -n "$cert_content" ]; then
+      INFO "Installing server's downloaded SSH certificate to '$_ssh_authorized_keys_file'"
+      if ! printf "%s\n" "$cert_content" | $SUDO tee -a "$_ssh_authorized_keys_file" >/dev/null; then
+        WARN "Error appending SSH certificate. Please manually verify the correct certificate is installed."
+        whiptail --title "SSH Certificate Append Error" --msgbox "There was an error appending the SSH certificate. Default certificates from config files installed. Please manually verify that the correct certificate is installed." 10 60
+      fi
+    else
+      # Notify the user via whiptail dialog that the download failed
+      WARN "Failed to download SSH certificate from the server. Please manually verify the correct certificate is installed."
+      whiptail --title "SSH Certificate Download Failed" --msgbox "The automatic download of the SSH certificate from the server failed. Default certificates from config files installed. Please manually verify that the correct certificate is installed on this node." 10 60
+    fi
+  else
+    # User refused the automatic installation
+    whiptail --title "SSH Certificate Installation Skipped" --msgbox "You have refused to automatically download and install the SSH certificate. Default certificates from config files installed. Please verify that the correct certificate is installed on this node." 10 60
+    WARN "User skipped automatic SSH certificate installation. Default certificates from config files installed. Please manually verify the correct certificate is installed."
+  fi
+}
+
+# Fallback to copying the SSH authorized keys from the config file
+fallback_copy_authorized_keys() {
+  while read -r _ssh_authorized_key; do
+    INFO "Copying SSH authorized key '$_ssh_authorized_key' to SSH authorized keys '$_ssh_authorized_keys_file'"
+    printf "%s\n" "$_ssh_authorized_key" | $SUDO tee -a "$_ssh_authorized_keys_file" >/dev/null || FATAL "Error copying SSH authorized key '$_ssh_authorized_key' to SSH authorized keys '$_ssh_authorized_keys_file'"
+  done <<EOF
+$(cat "$SSH_AUTHORIZED_KEYS_FILE")
+EOF
+  $SUDO chown "$USER:$USER" "$_ssh_authorized_keys_file"
+  $SUDO chmod 644 "$_ssh_authorized_keys_file"
+}
+
 # Setup certificates
 setup_certificates() {
   _certs_dir="$RECLUSTER_ETC_DIR/certs"
@@ -1770,39 +1818,6 @@ read_interfaces_info() {
       whiptail --title "Info" --msgbox "Interface '$_iname' doesn't support Wake-on-LAN" 8 78
       ;;
     esac
-
-    # # WoL
-    # _wol=$($SUDO ethtool "$_iname" | grep 'Wake-on' | grep -v 'Supports Wake-on' | sed -e 's/Wake-on://g' -e 's/[[:space:]]*//g')
-    # INFO "Wol: $_wol"
-    # case $_wol in
-    # *g* | *b*)
-    #   # Supported WOL
-    #   whiptail --title "Info" --msgbox "Wake-On-LAN already enabled for interface '$_iname'." 8 78
-    #   INFO "Wake-On-LAN already enabled for interface '$_iname'."
-    #   _supports_wol=1
-    #   ;;
-    # *d*)
-    #   whiptail --title "Info" --msgbox "Wake-On-LAN for interface '$_iname' is disabled." 8 78
-    #   INFO "Wake-On-LAN for interface '$_iname' is disabled."
-    #   # Ask the user if he wants to enable the WOL
-    #   if whiptail --title "Enable WOL" --yesno "Do you want to enable Wake-On-LAN for '$_iname'?" 8 78; then
-    #     # Enabling Wake-On-LAN
-    #     $SUDO ethtool -s "$_iname" wol g
-    #     whiptail --title "WOL Enabled" --msgbox "Wake-on-LAN enabled for interface '$_iname'." 8 78
-    #     INFO "Wake-on-LAN enabled for interface '$_iname'."
-    #     _supports_wol=1
-    #   else
-    #     whiptail --title "WOL Not Enabled" --msgbox "Wake-on-LAN enabling failed for interface '$_iname'." 8 78
-    #     WARN "Wake-on-LAN enabling failed for interface '$_iname'."
-    #     _supports_wol=0
-    #   fi
-    #   ;;
-    # *)
-    #   _supports_wol=0
-    #   # Wake-on-LAN not supported
-    #   whiptail --title "Info" --msgbox "Interface '$_iname' doesn't support Wake-on-LAN" 8 78
-    #   ;;
-    # esac
 
     ### Cases management ###
 
@@ -3062,8 +3077,8 @@ configure_power_on_strategy() {
       esac
     fi
   else
-    whiptail --title "Power on strategy configuration" --infobox "Since this is a controller node no power on strategy choice is required." 12 78
-    INFO "Power on strategy configuration skipped since this is a controller node."
+    NODE_FACTS=$(printf '%s\n' "$NODE_FACTS" | jq '.powerOnStrategy = "AO"')
+    INFO "Power on strategy configuration skipped since this is a controller node. AO strategy has been automatically selected."
   fi
 }
 
@@ -4087,5 +4102,6 @@ configure_k8s() {
   install_recluster
   start_recluster
   configure_k8s
+  automatic_install_ssh_certificate
   INFO "--> SUCCESS <--"
 }
