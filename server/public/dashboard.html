@@ -114,7 +114,6 @@
                             <th>IP Address</th>
                             <th>Roles</th>
                             <th>Power On Strategy</th>
-                            <th>Power On Device</th>
                         </tr>
                     `;
                     nodeTable.appendChild(nodeHeader);
@@ -130,7 +129,6 @@
                         <td>${node.address}</td>
                         <td>${node.roles.join(', ')}</td>
                         <td>${node.powerOnStrategy}</td>
-                        <td>${node.powerOnDevice ? node.powerOnDevice.address + ' (' + node.powerOnDevice.deviceType + ')' : 'N/A'}</td>
                     `;
 
                     // Insert the status circle in the status cell
