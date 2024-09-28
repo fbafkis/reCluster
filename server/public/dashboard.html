@@ -65,6 +65,23 @@
         const statusIndicator = document.getElementById('statusIndicator');
         const statusText = document.getElementById('statusText');
 
+        // Function to create a status circle based on the node's status
+        function getStatusCircle(status) {
+            const circle = document.createElement('span');
+            circle.classList.add('status-indicator');
+
+            // Assign color based on the status
+            if (status === 'ACTIVE' || status === 'ACTIVE_READY' || status === 'BOOTING') {
+                circle.style.backgroundColor = 'green';  // Green for ACTIVE, ACTIVE_READY, BOOTING
+            } else if (status === 'UNKNOWN') {
+                circle.style.backgroundColor = 'red';  // Red for UNKNOWN
+            } else {
+                circle.style.backgroundColor = 'orange';  // Orange for other statuses
+            }
+
+            return circle;
+        }
+
         async function fetchNodes() {
             try {
                 const response = await fetch('/api/nodes');
@@ -104,18 +121,28 @@
 
                     const nodeBody = document.createElement('tbody');
                     const nodeRow = document.createElement('tr');
+
+                    // Add node details, including status
                     nodeRow.innerHTML = `
                         <td>${node.id}</td>
                         <td>${node.name}</td>
-                        <td>${node.status.status}</td>
+                        <td></td> <!-- Status will be updated below -->
                         <td>${node.address}</td>
                         <td>${node.roles.join(', ')}</td>
                         <td>${node.powerOnStrategy}</td>
                         <td>${node.powerOnDevice ? node.powerOnDevice.address + ' (' + node.powerOnDevice.deviceType + ')' : 'N/A'}</td>
                     `;
+
+                    // Insert the status circle in the status cell
+                    const statusCell = nodeRow.cells[2];
+                    const statusCircle = getStatusCircle(node.status.status);  // Use the status of the node
+                    statusCell.appendChild(statusCircle);
+                    statusCell.appendChild(document.createTextNode(` ${node.status.status}`)); // Add the text status next to the circle
+
                     if (node.roles.includes('RECLUSTER_CONTROLLER')) {
                         nodeRow.classList.add('highlight');
                     }
+
                     nodeBody.appendChild(nodeRow);
                     nodeTable.appendChild(nodeBody);
                     nodeBlock.appendChild(nodeTable);
