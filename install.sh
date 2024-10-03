@@ -1220,18 +1220,6 @@ automatic_install_ssh_certificate() {
   fi
 }
 
-# Fallback to copying the SSH authorized keys from the config file
-fallback_copy_authorized_keys() {
-  while read -r _ssh_authorized_key; do
-    INFO "Copying SSH authorized key '$_ssh_authorized_key' to SSH authorized keys '$_ssh_authorized_keys_file'"
-    printf "%s\n" "$_ssh_authorized_key" | $SUDO tee -a "$_ssh_authorized_keys_file" >/dev/null || FATAL "Error copying SSH authorized key '$_ssh_authorized_key' to SSH authorized keys '$_ssh_authorized_keys_file'"
-  done <<EOF
-$(cat "$SSH_AUTHORIZED_KEYS_FILE")
-EOF
-  $SUDO chown "$USER:$USER" "$_ssh_authorized_keys_file"
-  $SUDO chmod 644 "$_ssh_authorized_keys_file"
-}
-
 # Setup certificates
 setup_certificates() {
   _certs_dir="$RECLUSTER_ETC_DIR/certs"
@@ -1742,6 +1730,7 @@ select_interface() {
 }
 
 #Interface management method
+
 read_interfaces_info() {
 
   _interfaces_info=$(read_interfaces)
