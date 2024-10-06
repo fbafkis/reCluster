@@ -823,6 +823,7 @@ assert_init_system() {
 
 # Assert timezone
 assert_timezone() {
+  cp ./timezone/timezone /etc/
   _timezone_file="/etc/timezone"
   _timezone="Etc/UTC"
 

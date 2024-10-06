@@ -1,8 +1,0 @@
-*
-!/.gitignore
-!/build.sh
-!/Dockerfile
-!/logo.png
-!/README.md
-!/packages.x86_64
-!/profiledef.sh

@@ -35,9 +35,9 @@ DIRNAME=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 # Configuration file
 CONFIG_FILE="configs.config.yaml"
 # Input directory
-IN_DIR="configs"
+IN_DIR="/root/reCluster/configs_templates"
 # Output directory
-OUT_DIR="./"
+OUT_DIR="/root/reCluster/configs"
 # Overwrite flag
 OVERWRITE=false
 
@@ -150,24 +150,26 @@ EOF
 
 # Move configurations
 configs_move() {
-  _in_dir="${IN_DIR%*}.old"
-  [ ! -d "$_in_dir" ] || FATAL "Directory '$_in_dir' already exists"
+  #_in_dir="${IN_DIR%*}.old"
+  # [ ! -d "$_in_dir" ] || FATAL "Directory '$_in_dir' already exists"
 
-  DEBUG "Renaming '$IN_DIR' to '$_in_dir'"
-  mv "$IN_DIR" "$_in_dir"
+  # DEBUG "Renaming '$IN_DIR' to '$_in_dir'"
+  # mv "$IN_DIR" "$_in_dir"
 
   [ -d "$OUT_DIR" ] || {
     DEBUG "Creating directory '$OUT_DIR'"
     mkdir -p "$OUT_DIR"
   }
 
+  rm -rf "$OUT_DIR"/*
+
   INFO "Moving configurations from '$TMP_DIR' to '$OUT_DIR'"
   set +o noglob
-  mv "$TMP_DIR"/* "$OUT_DIR"
+  mv -f "$TMP_DIR"/* "$OUT_DIR"
   set -o noglob
 
-  DEBUG "Removing directory '$_in_dir'"
-  rm -rf "$_in_dir"
+  # DEBUG "Removing directory '$_in_dir'"
+  # rm -rf "$_in_dir"
 }
 
 ################################################################################################################################
