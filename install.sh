@@ -1732,36 +1732,167 @@ select_interface() {
 
 #Interface management method
 
+# read_interfaces_info() {
+
+#   _interfaces_info=$(read_interfaces)
+#   #Valid interfaces
+#   _valid_interfaces='[]'
+
+#   ### Cycle over interfaces to obtain additional information ###
+
+#   echo "$_interfaces_info" | jq -r '.[] | "\(.name) \(.address)"' >$TMP_DIR/interfaces_info.txt
+
+#   while read -r _iname _address; do
+#     INFO "Processing $_iname with address $_address" # Name
+
+#     # Speed
+#     _speed=$($SUDO ethtool "$_iname" | grep Speed | sed -e 's/Speed://g' -e 's/[[:space:]]*//g' -e 's/b.*//')
+#     if [ -z "$_speed" ] || [ "$_speed" = "Unknown!" ]; then
+#       _speed=0
+#     elif [[ $_speed =~ [0-9]+[MG] ]]; then
+#       # If _speed is in the format '1000M' or '1G', extract the number
+#       _speed=$(echo $_speed | sed -e 's/[MG]//')
+#       DEBUG "Valid speed value $_speed read for interface $_iname ."
+#     else
+#       INFO "$_speed"
+#       whiptail --title "Speed value not valid." --msgbox "The speed value '$_speed' for the interface '$_iname' is not valid. The interface will be excluded." 10 60
+#       WARN "The speed value '$_speed' for the interface '$_iname' is not valid. The interface will be excluded."
+#       _speed=0
+#     fi
+
+#     _wol=$($SUDO ethtool "$_iname" | grep 'Wake-on' | grep -v 'Supports Wake-on' | sed -e 's/Wake-on://g' -e 's/[[:space:]]*//g')
+#     INFO "Wol: $_wol"
+#     case $_wol in
+#     *g* | *b*)
+#       # Supported WOL
+#       whiptail --title "Info" --msgbox "Wake-On-LAN already enabled for interface '$_iname'." 8 78
+#       INFO "Wake-On-LAN already enabled for interface '$_iname'."
+#       _supports_wol=1
+#       ;;
+#     *d*)
+#       whiptail --title "Wake-On-Lan " --msgbox "Wake-On-LAN for interface '$_iname' is disabled." 8 78
+#       INFO "Wake-On-LAN for interface '$_iname' is disabled."
+#       # Ask the user if he wants to enable the WOL
+#       if whiptail --title "Enable WOL" --yesno "Do you want to enable Wake-On-LAN for '$_iname'?" 8 78; then
+#         # Enabling Wake-On-LAN
+#         $SUDO ethtool -s "$_iname" wol g
+#         local exitstatus=$?
+#         if [ $exitstatus -ne 0 ]; then
+#           WARN "Failed to set WOL for interface '$_iname'. ethtool exit status: $exitstatus"
+#         else
+#           INFO "WOL command executed successfully for interface '$_iname'."
+#         fi
+
+#         # Verify if WOL is enabled
+#         _wol=$($SUDO ethtool "$_iname" | grep "Wake-on" | grep -v 'Supports Wake-on' | awk -F': ' '{print $2}')
+#         INFO "WOL: $_wol"
+#         if [ "$_wol" == "g" ]; then
+#           whiptail --title "WOL Enabled" --msgbox "Wake-on-LAN enabled for interface '$_iname'." 8 78
+#           INFO "Wake-on-LAN enabled for interface '$_iname'."
+#           _interfaces_info=$(read_interfaces)
+#           _supports_wol=1
+#         else
+#           whiptail --title "WOL Not Enabled" --msgbox "Failed to enable Wake-on-LAN for interface '$_iname'. Current WOL flag: $_wol" 8 78
+#           WARN "Wake-on-LAN enabling failed for interface '$_iname'. Current WOL flag: $_wol"
+#           _supports_wol=0
+#         fi
+#       else
+#         whiptail --title "WOL Not Enabled" --msgbox "Wake-on-LAN enabling cancelled for interface '$_iname'." 8 78
+#         WARN "Wake-on-LAN enabling cancelled for interface '$_iname'."
+#         _supports_wol=0
+#       fi
+#       ;;
+#     *)
+#       _supports_wol=0
+#       # Wake-on-LAN not supported
+#       whiptail --title "Info" --msgbox "Interface '$_iname' doesn't support Wake-on-LAN" 8 78
+#       ;;
+#     esac
+
+#     ### Cases management ###
+
+#     #1: No WOL support, but valid speed.
+#     if [ $_supports_wol -eq 0 ] && [ "$_speed" -ne 0 ]; then
+#       #1.1: The current node is an initiator node.
+#       if [ "$INIT_CLUSTER" = true ]; then
+#         if whiptail --title "Check Interface Support" --yesno "It seems like the interface '$_iname' is not supporting Wake-on-LAN or it can't be enabled. Since this machine is going to be configured as initiator node, and Wake-on-Lan is not needed, do you want to add this interface to the list of valid interfaces?" 12 78; then
+#           update_valid_interfaces
+#         else
+#           INFO "The current interface '$_iname' has been excluded as the user marked it as not valid."
+#         fi
+#       fi
+#     #2: WOL support and valid speed, valid interface.
+#     elif [ $_supports_wol -eq 1 ] && [ "$_speed" -ne 0 ]; then
+#       if whiptail --title "Check Interface Support" --yesno "The interface '$_iname' is supporting Wake-on-LAN, and appears to be perfectly valid to be used as node management interface. Do you want to add it to the list of valid interfaces?" 12 78; then
+#         update_valid_interfaces
+#       else
+#         INFO "The current interface '$_iname' has been excluded by the user."
+#       fi
+#     #3: No valid speed, can't use the interface.
+#     elif [ "$_speed" -eq 0 ]; then
+#       whiptail --title "Info" --msgbox "Interface '$_iname' is not valid (unable to read speed value) and it is going to be excluded." 8 78
+#       INFO "Interface '$_iname' is not valid (unable to read speed value) and it is going to be excluded."
+#     fi
+#   done <$TMP_DIR/interfaces_info.txt
+#   rm $TMP_DIR/interfaces_info.txt
+
+#   INFO "Valid interfaces before selection: $_valid_interfaces".
+
+#   select_interface
+
+#   # Return
+#   RETVAL=$_valid_interfaces
+# }
+
 read_interfaces_info() {
 
   _interfaces_info=$(read_interfaces)
-  #Valid interfaces
+  # Valid interfaces
   _valid_interfaces='[]'
 
   ### Cycle over interfaces to obtain additional information ###
-
   echo "$_interfaces_info" | jq -r '.[] | "\(.name) \(.address)"' >$TMP_DIR/interfaces_info.txt
 
   while read -r _iname _address; do
     INFO "Processing $_iname with address $_address" # Name
 
-    # Speed
+    # Check operstate using ip command
+    _operstate=$(ip link show "$_iname" | grep 'state' | awk '{print $9}')
+    
+    if [ "$_operstate" != "UP" ]; then
+      INFO "The interface '$_iname' is not UP (current state: $_operstate) and will be excluded."
+      whiptail --title "Interface Excluded" --msgbox "The interface '$_iname' is not in UP state (current state: $_operstate). It will be excluded." 8 60
+      continue
+    else
+      DEBUG "Interface '$_iname' is UP and will be processed."
+    fi
+
+    # Speed check (retained but not for exclusion purposes)
     _speed=$($SUDO ethtool "$_iname" | grep Speed | sed -e 's/Speed://g' -e 's/[[:space:]]*//g' -e 's/b.*//')
     if [ -z "$_speed" ] || [ "$_speed" = "Unknown!" ]; then
       _speed=0
+      INFO "No valid speed found for interface '$_iname', setting speed to 0."
     elif [[ $_speed =~ [0-9]+[MG] ]]; then
-      # If _speed is in the format '1000M' or '1G', extract the number
       _speed=$(echo $_speed | sed -e 's/[MG]//')
-      DEBUG "Valid speed value $_speed read for interface $_iname ."
+      DEBUG "Valid speed value $_speed read for interface $_iname."
     else
-      INFO "$_speed"
-      whiptail --title "Speed value not valid." --msgbox "The speed value '$_speed' for the interface '$_iname' is not valid. The interface will be excluded." 10 60
-      WARN "The speed value '$_speed' for the interface '$_iname' is not valid. The interface will be excluded."
+      INFO "The speed value for interface '$_iname' is not valid, but the interface will still be processed."
       _speed=0
     fi
 
+    # Wake-on-LAN (WOL) status
     _wol=$($SUDO ethtool "$_iname" | grep 'Wake-on' | grep -v 'Supports Wake-on' | sed -e 's/Wake-on://g' -e 's/[[:space:]]*//g')
-    INFO "Wol: $_wol"
+
+    _wol_artificially_set=false
+    # If WOL is empty or invalid, set it to 'd' but mark it as artificially set
+    if [ -z "$_wol" ]; then
+      _wol="d"
+      _wol_artificially_set=true
+      INFO "No valid WOL flag found for interface '$_iname', setting WOL to 'd' artificially."
+    else
+      INFO "WOL flag for interface '$_iname': $_wol"
+    fi
+
     case $_wol in
     *g* | *b*)
       # Supported WOL
@@ -1770,35 +1901,41 @@ read_interfaces_info() {
       _supports_wol=1
       ;;
     *d*)
-      whiptail --title "Wake-On-Lan " --msgbox "Wake-On-LAN for interface '$_iname' is disabled." 8 78
-      INFO "Wake-On-LAN for interface '$_iname' is disabled."
-      # Ask the user if he wants to enable the WOL
-      if whiptail --title "Enable WOL" --yesno "Do you want to enable Wake-On-LAN for '$_iname'?" 8 78; then
-        # Enabling Wake-On-LAN
-        $SUDO ethtool -s "$_iname" wol g
-        local exitstatus=$?
-        if [ $exitstatus -ne 0 ]; then
-          WARN "Failed to set WOL for interface '$_iname'. ethtool exit status: $exitstatus"
-        else
-          INFO "WOL command executed successfully for interface '$_iname'."
-        fi
+      # Show dialog to enable WOL only if 'd' was **read from ethtool** (not artificially set)
+      if [ "$_wol_artificially_set" = false ]; then
+        whiptail --title "Wake-On-LAN" --msgbox "Wake-On-LAN for interface '$_iname' is disabled." 8 78
+        INFO "Wake-On-LAN for interface '$_iname' is disabled."
+        # Ask the user if they want to enable the WOL
+        if whiptail --title "Enable WOL" --yesno "Do you want to enable Wake-On-LAN for '$_iname'?" 8 78; then
+          # Enabling Wake-On-LAN
+          $SUDO ethtool -s "$_iname" wol g
+          local exitstatus=$?
+          if [ $exitstatus -ne 0 ]; then
+            WARN "Failed to set WOL for interface '$_iname'. ethtool exit status: $exitstatus"
+          else
+            INFO "WOL command executed successfully for interface '$_iname'."
+          fi
 
-        # Verify if WOL is enabled
-        _wol=$($SUDO ethtool "$_iname" | grep "Wake-on" | grep -v 'Supports Wake-on' | awk -F': ' '{print $2}')
-        INFO "WOL: $_wol"
-        if [ "$_wol" == "g" ]; then
-          whiptail --title "WOL Enabled" --msgbox "Wake-on-LAN enabled for interface '$_iname'." 8 78
-          INFO "Wake-on-LAN enabled for interface '$_iname'."
-          _interfaces_info=$(read_interfaces)
-          _supports_wol=1
+          # Verify if WOL is enabled
+          _wol=$($SUDO ethtool "$_iname" | grep "Wake-on" | grep -v 'Supports Wake-on' | awk -F': ' '{print $2}')
+          INFO "WOL: $_wol"
+          if [ "$_wol" == "g" ]; then
+            whiptail --title "WOL Enabled" --msgbox "Wake-on-LAN enabled for interface '$_iname'." 8 78
+            INFO "Wake-on-LAN enabled for interface '$_iname'."
+            _interfaces_info=$(read_interfaces)
+            _supports_wol=1
+          else
+            whiptail --title "WOL Not Enabled" --msgbox "Failed to enable Wake-on-LAN for interface '$_iname'. Current WOL flag: $_wol" 8 78
+            WARN "Wake-on-LAN enabling failed for interface '$_iname'. Current WOL flag: $_wol"
+            _supports_wol=0
+          fi
         else
-          whiptail --title "WOL Not Enabled" --msgbox "Failed to enable Wake-on-LAN for interface '$_iname'. Current WOL flag: $_wol" 8 78
-          WARN "Wake-on-LAN enabling failed for interface '$_iname'. Current WOL flag: $_wol"
+          whiptail --title "WOL Not Enabled" --msgbox "Wake-on-LAN enabling cancelled for interface '$_iname'." 8 78
+          WARN "Wake-on-LAN enabling cancelled for interface '$_iname'."
           _supports_wol=0
         fi
       else
-        whiptail --title "WOL Not Enabled" --msgbox "Wake-on-LAN enabling cancelled for interface '$_iname'." 8 78
-        WARN "Wake-on-LAN enabling cancelled for interface '$_iname'."
+        INFO "Wake-On-LAN is artificially set to 'd', no dialog to enable WOL will be shown."
         _supports_wol=0
       fi
       ;;
@@ -1809,30 +1946,34 @@ read_interfaces_info() {
       ;;
     esac
 
-    ### Cases management ###
-
-    #1: No WOL support, but valid speed.
-    if [ $_supports_wol -eq 0 ] && [ "$_speed" -ne 0 ]; then
-      #1.1: The current node is an initiator node.
-      if [ "$INIT_CLUSTER" = true ]; then
-        if whiptail --title "Check Interface Support" --yesno "It seems like the interface '$_iname' is not supporting Wake-on-LAN or it can't be enabled. Since this machine is going to be configured as initiator node, and Wake-on-Lan is not needed, do you want to add this interface to the list of valid interfaces?" 12 78; then
+    ### Updated Case Management with Yes/No Dialogs ###
+    if [ "$_operstate" = "UP" ]; then
+      if [ "$_supports_wol" -eq 1 ] && [ "$INIT_CLUSTER" = false ]; then
+        # Case 1: Operstate is UP, WOL is supported, and INIT_CLUSTER is false
+        if whiptail --title "Valid Interface" --yesno "The interface '$_iname' supports Wake-on-LAN and is perfectly valid. Do you want to add it to the list of valid interfaces?" 10 60; then
           update_valid_interfaces
         else
-          INFO "The current interface '$_iname' has been excluded as the user marked it as not valid."
+          INFO "The current interface '$_iname' has been excluded by the user."
+        fi
+
+      elif [ "$_supports_wol" -eq 0 ] && [ "$INIT_CLUSTER" = true ]; then
+        # Case 2: Operstate is UP, no WOL, and INIT_CLUSTER is true (controller node)
+        if whiptail --title "Valid Interface for Controller" --yesno "The interface '$_iname' does not support Wake-on-LAN, but it is not required for controller node installation. Do you want to add this interface to the list of valid interfaces?" 10 60; then
+          update_valid_interfaces
+        else
+          INFO "The current interface '$_iname' has been excluded by the user."
+        fi
+
+      elif [ "$_supports_wol" -eq 0 ] && [ "$INIT_CLUSTER" = false ]; then
+        # Case 3: Operstate is UP, no WOL, and INIT_CLUSTER is false (other power-on options)
+        if whiptail --title "Valid Interface with Other Power-On Options" --yesno "The interface '$_iname' does not support Wake-on-LAN, but other power-on options are available. Do you want to add this interface to the list of valid interfaces?" 10 60; then
+          update_valid_interfaces
+        else
+          INFO "The current interface '$_iname' has been excluded by the user."
         fi
       fi
-    #2: WOL support and valid speed, valid interface.
-    elif [ $_supports_wol -eq 1 ] && [ "$_speed" -ne 0 ]; then
-      if whiptail --title "Check Interface Support" --yesno "The interface '$_iname' is supporting Wake-on-LAN, and appears to be perfectly valid to be used as node management interface. Do you want to add it to the list of valid interfaces?" 12 78; then
-        update_valid_interfaces
-      else
-        INFO "The current interface '$_iname' has been excluded by the user."
-      fi
-    #3: No valid speed, can't use the interface.
-    elif [ "$_speed" -eq 0 ]; then
-      whiptail --title "Info" --msgbox "Interface '$_iname' is not valid (unable to read speed value) and it is going to be excluded." 8 78
-      INFO "Interface '$_iname' is not valid (unable to read speed value) and it is going to be excluded."
     fi
+
   done <$TMP_DIR/interfaces_info.txt
   rm $TMP_DIR/interfaces_info.txt
 
@@ -1843,6 +1984,7 @@ read_interfaces_info() {
   # Return
   RETVAL=$_valid_interfaces
 }
+
 
 # Execute CPU benchmark
 run_cpu_bench() {
