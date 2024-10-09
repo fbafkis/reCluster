@@ -33,7 +33,7 @@ DIRNAME=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 # CONFIGURATION
 # ================
 # Configuration file
-CONFIG_FILE="/root/reCluster/configs.config.yaml"
+CONFIG_FILE="/root/reCluster/scripts/configs.config.yaml"
 # Input directory
 IN_DIR="/root/reCluster/configs_templates"
 # Output directory

@@ -1,8 +1,6 @@
 # reCluster
-**/build/
 **/coverage/
 **/node_modules/
-*.tar.gz
 *.iso
 *.graphql
 *.key
@@ -47,7 +45,6 @@ bower_components
 .lock-wscript
 
 # Compiled binary addons (https://nodejs.org/api/addons.html)
-build/Release
 
 # Dependency directories
 node_modules/
