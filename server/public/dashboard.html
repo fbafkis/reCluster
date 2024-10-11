@@ -14,7 +14,7 @@
         }
         .node-block {
             margin-bottom: 30px;
-            border-top: 3px solid #333;
+            border-top: 3px solid #333; /* Thicker and darker line */
             padding-top: 20px;
         }
         .node-table, .interface-table, .poweron-table, .power-consumption-table {
@@ -133,9 +133,9 @@
 
                     // Insert the status circle in the status cell
                     const statusCell = nodeRow.cells[2];
-                    const statusCircle = getStatusCircle(node.status.status);
+                    const statusCircle = getStatusCircle(node.status.status);  // Use the status of the node
                     statusCell.appendChild(statusCircle);
-                    statusCell.appendChild(document.createTextNode(` ${node.status.status}`));
+                    statusCell.appendChild(document.createTextNode(` ${node.status.status}`)); // Add the text status next to the circle
 
                     if (node.roles.includes('RECLUSTER_CONTROLLER')) {
                         nodeRow.classList.add('highlight');
@@ -144,38 +144,6 @@
                     nodeBody.appendChild(nodeRow);
                     nodeTable.appendChild(nodeBody);
                     nodeBlock.appendChild(nodeTable);
-
-                    // Power consumption title
-                    const powerTitle = document.createElement('div');
-                    powerTitle.classList.add('title');
-                    powerTitle.innerText = 'Power Consumption';
-                    nodeBlock.appendChild(powerTitle);
-
-                    // Power consumption table
-                    const powerTable = document.createElement('table');
-                    powerTable.classList.add('power-consumption-table');
-                    const powerHeader = document.createElement('thead');
-                    powerHeader.innerHTML = `
-                        <tr>
-                            <th>Min Power Consumption</th>
-                            <th>Max Efficiency Power Consumption</th>
-                            <th>Min Performance Power Consumption</th>
-                            <th>Max Power Consumption</th>
-                        </tr>
-                    `;
-                    powerTable.appendChild(powerHeader);
-
-                    const powerBody = document.createElement('tbody');
-                    const powerRow = document.createElement('tr');
-                    powerRow.innerHTML = `
-                        <td>${node.minPowerConsumption || 'N/A'}</td>
-                        <td>${node.maxEfficiencyPowerConsumption || 'N/A'}</td>
-                        <td>${node.minPerformancePowerConsumption || 'N/A'}</td>
-                        <td>${node.maxPowerConsumption || 'N/A'}</td>
-                    `;
-                    powerBody.appendChild(powerRow);
-                    powerTable.appendChild(powerBody);
-                    nodeBlock.appendChild(powerTable);
 
                     // Interfaces title
                     if (node.interfaces && node.interfaces.length > 0) {
@@ -214,6 +182,68 @@
                         interfaceTable.appendChild(interfaceBody);
                         nodeBlock.appendChild(interfaceTable);
                     }
+
+                    // Power On Device title
+                    if (node.powerOnDevice) {
+                        const powerOnTitle = document.createElement('div');
+                        powerOnTitle.classList.add('title');
+                        powerOnTitle.innerText = 'Power On Devices';
+                        nodeBlock.appendChild(powerOnTitle);
+
+                        // Power On Device table
+                        const powerOnTable = document.createElement('table');
+                        powerOnTable.classList.add('poweron-table');
+                        const powerOnHeader = document.createElement('thead');
+                        powerOnHeader.innerHTML = `
+                            <tr>
+                                <th>IP Address</th>
+                                <th>Type</th>
+                            </tr>
+                        `;
+                        powerOnTable.appendChild(powerOnHeader);
+
+                        const powerOnBody = document.createElement('tbody');
+                        const powerOnRow = document.createElement('tr');
+                        powerOnRow.innerHTML = `
+                            <td>${node.powerOnDevice.address}</td>
+                            <td>${node.powerOnDevice.deviceType}</td>
+                        `;
+                        powerOnBody.appendChild(powerOnRow);
+                        powerOnTable.appendChild(powerOnBody);
+                        nodeBlock.appendChild(powerOnTable);
+                    }
+
+                    // Power Consumption title
+                    const powerConsumptionTitle = document.createElement('div');
+                    powerConsumptionTitle.classList.add('title');
+                    powerConsumptionTitle.innerText = 'Power Consumption';
+                    nodeBlock.appendChild(powerConsumptionTitle);
+
+                    // Power Consumption table
+                    const powerConsumptionTable = document.createElement('table');
+                    powerConsumptionTable.classList.add('power-consumption-table');
+                    const powerConsumptionHeader = document.createElement('thead');
+                    powerConsumptionHeader.innerHTML = `
+                        <tr>
+                            <th>Min Power (W)</th>
+                            <th>Max Efficiency Power (W)</th>
+                            <th>Min Performance Power (W)</th>
+                            <th>Max Power (W)</th>
+                        </tr>
+                    `;
+                    powerConsumptionTable.appendChild(powerConsumptionHeader);
+
+                    const powerConsumptionBody = document.createElement('tbody');
+                    const powerConsumptionRow = document.createElement('tr');
+                    powerConsumptionRow.innerHTML = `
+                        <td>${node.minPowerConsumption || 'N/A'}</td>
+                        <td>${node.maxEfficiencyPowerConsumption || 'N/A'}</td>
+                        <td>${node.minPerformancePowerConsumption || 'N/A'}</td>
+                        <td>${node.maxPowerConsumption || 'N/A'}</td>
+                    `;
+                    powerConsumptionBody.appendChild(powerConsumptionRow);
+                    powerConsumptionTable.appendChild(powerConsumptionBody);
+                    nodeBlock.appendChild(powerConsumptionTable);
 
                     container.appendChild(nodeBlock);
                 });

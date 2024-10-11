@@ -33,13 +33,13 @@ DIRNAME=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 # CONFIGURATION
 # ================
 # Output directory
-OUT_DIR="./"
+OUT_DIR="/root/reCluster/configs_templates/certs"
 # Registry bits
 REGISTRY_BITS=4096
 # Registry domain
 REGISTRY_DOMAIN="recluster.local"
 # Registry IP address
-REGISTRY_IP="192.168.0.222"
+REGISTRY_IP="192.168.2.202"
 # Registry key name
 REGISTRY_NAME="registry"
 # SSH comment
@@ -87,7 +87,7 @@ trap cleanup INT QUIT TERM EXIT
 # ================
 # Show help message
 show_help() {
-  cat << EOF
+  cat <<EOF
 Usage: $(basename "$0") [--help] [--out-dir <DIRECTORY>]
         [--registry-bits <BITS>] [--registry-domain <DOMAIN>] [--registry-ip <IP>] [--registry-name <NAME>]
         [--ssh-comment <COMMENT>] [--ssh-name <NAME>] [--ssh-passphrase <PASSPHRASE>] [--ssh-rounds <ROUNDS>]
@@ -177,110 +177,110 @@ parse_args() {
     _shifts=1
 
     case $1 in
-      --help)
-        # Display help message and exit
-        show_help
-        exit 0
-        ;;
-      --out-dir)
-        # Output directory
-        parse_args_assert_value "$@"
+    --help)
+      # Display help message and exit
+      show_help
+      exit 0
+      ;;
+    --out-dir)
+      # Output directory
+      parse_args_assert_value "$@"
 
-        OUT_DIR=$2
-        _shifts=2
-        ;;
-      --registry-bits)
-        # Registry bits
-        parse_args_assert_value "$@"
-        parse_args_assert_positive_integer "$@"
+      OUT_DIR=$2
+      _shifts=2
+      ;;
+    --registry-bits)
+      # Registry bits
+      parse_args_assert_value "$@"
+      parse_args_assert_positive_integer "$@"
 
-        REGISTRY_BITS=$2
-        _shifts=2
-        ;;
-      --registry-domain)
-        # Registry domain
-        parse_args_assert_value "$@"
+      REGISTRY_BITS=$2
+      _shifts=2
+      ;;
+    --registry-domain)
+      # Registry domain
+      parse_args_assert_value "$@"
 
-        REGISTRY_DOMAIN=$2
-        _shifts=2
-        ;;
-      --registry-ip)
-        # Registry IP address
-        parse_args_assert_value "$@"
+      REGISTRY_DOMAIN=$2
+      _shifts=2
+      ;;
+    --registry-ip)
+      # Registry IP address
+      parse_args_assert_value "$@"
 
-        REGISTRY_IP=$2
-        _shifts=2
-        ;;
-      --registry-name)
-        # Registry key name
-        parse_args_assert_value "$@"
+      REGISTRY_IP=$2
+      _shifts=2
+      ;;
+    --registry-name)
+      # Registry key name
+      parse_args_assert_value "$@"
 
-        REGISTRY_NAME=$2
-        _shifts=2
-        ;;
-      --ssh-comment)
-        # SSH comment
-        parse_args_assert_value "$@"
+      REGISTRY_NAME=$2
+      _shifts=2
+      ;;
+    --ssh-comment)
+      # SSH comment
+      parse_args_assert_value "$@"
 
-        SSH_COMMENT=$2
-        _shifts=2
-        ;;
-      --ssh-name)
-        # SSH key name
-        parse_args_assert_value "$@"
+      SSH_COMMENT=$2
+      _shifts=2
+      ;;
+    --ssh-name)
+      # SSH key name
+      parse_args_assert_value "$@"
 
-        SSH_NAME=$2
-        _shifts=2
-        ;;
-      --ssh-passphrase)
-        # SSH passphrase
-        parse_args_assert_value "$@"
+      SSH_NAME=$2
+      _shifts=2
+      ;;
+    --ssh-passphrase)
+      # SSH passphrase
+      parse_args_assert_value "$@"
 
-        SSH_PASSPHRASE=$2
-        _shifts=2
-        ;;
-      --ssh-rounds)
-        # SSH rounds
-        parse_args_assert_value "$@"
-        parse_args_assert_positive_integer "$@"
+      SSH_PASSPHRASE=$2
+      _shifts=2
+      ;;
+    --ssh-rounds)
+      # SSH rounds
+      parse_args_assert_value "$@"
+      parse_args_assert_positive_integer "$@"
 
-        SSH_ROUNDS=$2
-        _shifts=2
-        ;;
-      --token-bits)
-        # Token bits
-        parse_args_assert_value "$@"
-        parse_args_assert_positive_integer "$@"
+      SSH_ROUNDS=$2
+      _shifts=2
+      ;;
+    --token-bits)
+      # Token bits
+      parse_args_assert_value "$@"
+      parse_args_assert_positive_integer "$@"
 
-        TOKEN_BITS=$2
-        _shifts=2
-        ;;
-      --token-comment)
-        # Token comment
-        parse_args_assert_value "$@"
+      TOKEN_BITS=$2
+      _shifts=2
+      ;;
+    --token-comment)
+      # Token comment
+      parse_args_assert_value "$@"
 
-        TOKEN_COMMENT=$2
-        _shifts=2
-        ;;
-      --token-name)
-        # Token key name
-        parse_args_assert_value "$@"
+      TOKEN_COMMENT=$2
+      _shifts=2
+      ;;
+    --token-name)
+      # Token key name
+      parse_args_assert_value "$@"
 
-        TOKEN_NAME=$2
-        _shifts=2
-        ;;
-      --token-passphrase)
-        # Token passphrase
-        parse_args_assert_value "$@"
+      TOKEN_NAME=$2
+      _shifts=2
+      ;;
+    --token-passphrase)
+      # Token passphrase
+      parse_args_assert_value "$@"
 
-        TOKEN_PASSPHRASE=$2
-        _shifts=2
-        ;;
-      *)
-        # Commons
-        parse_args_commons "$@"
-        _shifts=$RETVAL
-        ;;
+      TOKEN_PASSPHRASE=$2
+      _shifts=2
+      ;;
+    *)
+      # Commons
+      parse_args_commons "$@"
+      _shifts=$RETVAL
+      ;;
     esac
 
     # Shift arguments
@@ -319,7 +319,7 @@ cert_token() {
   INFO "Generating Token certificate"
 
   ssh-keygen -t rsa -b "$TOKEN_BITS" -f "$TMP_DIR/$TOKEN_NAME.key" -N "$TOKEN_PASSPHRASE" -C "$TOKEN_COMMENT" -m PEM
-  ssh-keygen -e -m PEM -f "$TMP_DIR/$TOKEN_NAME.key" -P "$TOKEN_PASSPHRASE" > "$TMP_DIR/$TOKEN_NAME.crt"
+  ssh-keygen -e -m PEM -f "$TMP_DIR/$TOKEN_NAME.key" -P "$TOKEN_PASSPHRASE" >"$TMP_DIR/$TOKEN_NAME.crt"
   rm "$TMP_DIR/$TOKEN_NAME.key.pub"
   chmod 600 "$TMP_DIR/$TOKEN_NAME.key" "$TMP_DIR/$TOKEN_NAME.crt"
 }
