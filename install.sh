@@ -875,16 +875,23 @@ check_sysbench() {
       if whiptail --title "Sysbench installation" --yesno "Do you want to install it using the apk packet manager?" 8 78; then
         # Install sysbench
         apk update
-        apk add sysbench
-        # Updating the sysbench binary path
-        SYSBENCH_PATH="/usr/bin/sysbench"
-        whiptail --title "Installation successful" --msgbox "Sysbench installation through apk packet manager succeded." 10 78
-        # Call again the check_system method.
-        check_sysbench
+        if apk add sysbench; then
+          # If the installation is successful
+          # Updating the sysbench binary path
+          SYSBENCH_PATH="/usr/bin/sysbench"
+          whiptail --title "Installation successful" --msgbox "Sysbench installation through apk packet manager succeeded." 10 78
+          # Call again the check_system method
+          check_sysbench
+        else
+          # If the installation fails
+          whiptail --title "Installation failed" --msgbox "Sysbench installation using packet manager failed. You can still proceed compiling Sysbench from source." 10 78
+          compile_sysbench
+        fi
       else
         whiptail --title "Installation refused" --msgbox "The user has refused to install Sysbench through the apk packet manager. You can still proceed compiling Sysbench from source." 10 78
         compile_sysbench
       fi
+
     else
       # If there is no internet connection, notify the user to install sysbench offline.
       whiptail --title "Network Error" --msgbox "No internet connection, it is not possible to install Sysbench automatically using the apk packet manager. You can still proceed compiling Sysbench from source." 10 78
@@ -1858,7 +1865,7 @@ read_interfaces_info() {
 
     # Check operstate using ip command
     _operstate=$(ip link show "$_iname" | grep 'state' | awk '{print $9}')
-    
+
     if [ "$_operstate" != "UP" ]; then
       INFO "The interface '$_iname' is not UP (current state: $_operstate) and will be excluded."
       whiptail --title "Interface Excluded" --msgbox "The interface '$_iname' is not in UP state (current state: $_operstate). It will be excluded." 8 60
@@ -1984,7 +1991,6 @@ read_interfaces_info() {
   # Return
   RETVAL=$_valid_interfaces
 }
-
 
 # Execute CPU benchmark
 run_cpu_bench() {
